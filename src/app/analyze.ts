@@ -33,6 +33,9 @@ export interface AnalyzeResult {
   matches: MatchResult[];
   path?: BuildPath;
   guide?: SurvivalGuide;
+  // Allocated passive-node ids for the tree view: yours, and the #1 match's.
+  userNodes: number[];
+  targetNodes: number[];
 }
 
 /** Decode/parse a build, match it against the corpus, plan the path, and (if the
@@ -89,5 +92,7 @@ export async function analyze(
     matches,
     path,
     guide,
+    userNodes: user.treeNodes,
+    targetNodes: matches[0]?.target.treeNodes ?? [],
   };
 }

@@ -91,6 +91,7 @@ app.post("/api/analyze", async (req, reply) => {
       user: result.user,
       engineError: result.engineError,
       html,
+      tree: { userNodes: result.userNodes, targetNodes: result.targetNodes },
     };
   } catch (e) {
     reply.code(400);

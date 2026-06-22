@@ -173,6 +173,13 @@ approval — so the web app launches without OAuth and gains it later.
   (MAX_INFLIGHT); 4 MB body limit. Static frontend `public/index.html`.
 - **W3 — file upload** ✅ (`.txt`/`.pob` → textarea) + paste + league selector in the
   page. *Remaining:* "download report" button, shareable saved reports (optional).
+- **W3.5 — interactive passive tree** ✅ A pannable/zoomable SVG of the full PoE2
+  tree: your allocated nodes in gold, the #1 match's additions in green, keystones/
+  notables sized up. Tree data is converted once from PoB's `tree.lua` →
+  `public/tree-<ver>.json` (`scripts/tree_to_json.lua`, run via `npm run build:tree`)
+  with precomputed positions (group + `orbitRadii` + `orbitAnglesByOrbit`) and edges.
+  `/api/analyze` returns `tree.{userNodes,targetNodes}`; the page fetches the tree
+  JSON once and renders. Makes the "path" visual.
 - **W4 — corpus refresh job** (scheduled `cli corpus`), multi-league corpora,
   container image (Node + LuaJIT + PoB checkout + Chromium), deploy.
 - **W5 — OAuth import** once a confidential client is approved: `/auth/ggg/*`,

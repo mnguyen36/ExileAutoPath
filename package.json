@@ -11,6 +11,7 @@
     "dev": "tsx src/cli.ts",
     "cli": "tsx src/cli.ts",
     "serve": "tsx src/server/server.ts",
+    "build:tree": "node scripts/build-tree.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

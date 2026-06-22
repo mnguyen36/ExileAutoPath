@@ -25,6 +25,19 @@
       .status.warn { color: #e6cf94; }
       iframe { width: 100%; min-height: 720px; border: 1px solid #2a2e39; border-radius: 10px; margin-top: 16px; background: #13151a; }
       a { color: #6fa8d6; }
+      #treePanel { margin-top: 16px; display: none; }
+      #treePanel h2 { font-size: 16px; color: #caa85a; margin: 0 0 8px; }
+      .legend { font-size: 12px; color: #9a958a; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+      .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+      #tree { width: 100%; height: 580px; background: #0f1115; border: 1px solid #2a2e39; border-radius: 10px; touch-action: none; cursor: grab; display: block; }
+      #tree:active { cursor: grabbing; }
+      #tree .edges { stroke: #262b37; stroke-width: 8; fill: none; }
+      #tree .edgesAdd { stroke: #3f6b50; stroke-width: 14; fill: none; }
+      #tree circle.n { fill: #353b49; }
+      #tree circle.nn { fill: #59617a; }
+      #tree circle.nk { fill: #9a7fc0; }
+      #tree circle.nt { fill: #5fae7a; }
+      #tree circle.nu { fill: #caa85a; }
     </style>
   </head>
   <body>
@@ -44,6 +57,19 @@
         <div class="status" id="status"></div>
       </div>
       <iframe id="report" title="report" sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe>
+
+      <div id="treePanel">
+        <h2>Passive tree</h2>
+        <div class="legend">
+          <span><i style="background:#caa85a"></i>your allocation</span>
+          <span><i style="background:#5fae7a"></i>nodes the #1 build adds</span>
+          <span><i style="background:#9a7fc0"></i>keystone</span>
+          <span><i style="background:#59617a"></i>notable</span>
+          <button id="fit">Fit</button>
+          <span class="hint">scroll to zoom · drag to pan</span>
+        </div>
+        <svg id="tree" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
     </div>
 
     <script type="module">
@@ -77,6 +103,86 @@
         status(`Loaded ${f.name}.`);
       });
 
+      // ---- passive tree ----
+      let TREE = null;
+      let vb = null;
+      const svg = $("tree");
+
+      async function loadTree() {
+        if (TREE) return TREE;
+        const t = await fetch("/tree-0_5.json").then((r) => r.json());
+        t.byId = new Map(t.nodes.map((n) => [n.id, n]));
+        TREE = t;
+        return t;
+      }
+      function setViewBox(x, y, w, h) {
+        vb = { x, y, w, h };
+        svg.setAttribute("viewBox", `${x} ${y} ${w} ${h}`);
+      }
+      async function showTree(tree) {
+        if (!tree || !tree.userNodes) return;
+        const t = await loadTree().catch(() => null);
+        if (!t) return;
+        const userSet = new Set(tree.userNodes);
+        const targetSet = new Set(tree.targetNodes || []);
+        const inSet = (id) => userSet.has(id) || targetSet.has(id);
+        let base = "", add = "";
+        for (const n of t.nodes) {
+          if (!n.c) continue;
+          for (const cid of n.c) {
+            if (n.id >= cid) continue; // dedupe undirected edges
+            const m = t.byId.get(cid);
+            if (!m) continue;
+            const seg = `M${n.x} ${n.y}L${m.x} ${m.y}`;
+            if (inSet(n.id) && inSet(m.id)) add += seg;
+            else base += seg;
+          }
+        }
+        let circles = "";
+        for (const n of t.nodes) {
+          let cls = "n", r = 16;
+          if (userSet.has(n.id)) { cls = "nu"; r = 62; }
+          else if (targetSet.has(n.id)) { cls = "nt"; r = 54; }
+          else if (n.k) { cls = "nk"; r = 42; }
+          else if (n.t) { cls = "nn"; r = 26; }
+          const title = (n.n || "").replace(/[<&>]/g, "");
+          circles += `<circle class="${cls}" cx="${n.x}" cy="${n.y}" r="${r}">${title ? `<title>${title}</title>` : ""}</circle>`;
+        }
+        svg.innerHTML = `<path class="edges" d="${base}"/><path class="edgesAdd" d="${add}"/>${circles}`;
+
+        const focus = t.nodes.filter((n) => inSet(n.id));
+        let bb;
+        if (focus.length) {
+          const xs = focus.map((n) => n.x), ys = focus.map((n) => n.y);
+          bb = { x: Math.min(...xs), y: Math.min(...ys), X: Math.max(...xs), Y: Math.max(...ys) };
+        } else {
+          bb = { x: t.minX, y: t.minY, X: t.maxX, Y: t.maxY };
+        }
+        const pad = Math.max(bb.X - bb.x, bb.Y - bb.y) * 0.2 + 600;
+        TREE._fit = { x: bb.x - pad, y: bb.y - pad, w: bb.X - bb.x + 2 * pad, h: bb.Y - bb.y + 2 * pad };
+        setViewBox(TREE._fit.x, TREE._fit.y, TREE._fit.w, TREE._fit.h);
+        $("treePanel").style.display = "block";
+      }
+      svg.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        if (!vb) return;
+        const f = e.deltaY < 0 ? 0.84 : 1.19;
+        const rect = svg.getBoundingClientRect();
+        const mx = vb.x + ((e.clientX - rect.left) / rect.width) * vb.w;
+        const my = vb.y + ((e.clientY - rect.top) / rect.height) * vb.h;
+        setViewBox(mx - (mx - vb.x) * f, my - (my - vb.y) * f, vb.w * f, vb.h * f);
+      }, { passive: false });
+      let drag = null;
+      svg.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY }; svg.setPointerCapture(e.pointerId); });
+      svg.addEventListener("pointermove", (e) => {
+        if (!drag || !vb) return;
+        const rect = svg.getBoundingClientRect();
+        setViewBox(vb.x - ((e.clientX - drag.x) / rect.width) * vb.w, vb.y - ((e.clientY - drag.y) / rect.height) * vb.h, vb.w, vb.h);
+        drag = { x: e.clientX, y: e.clientY };
+      });
+      svg.addEventListener("pointerup", () => (drag = null));
+      $("fit").addEventListener("click", () => { if (TREE && TREE._fit) setViewBox(TREE._fit.x, TREE._fit.y, TREE._fit.w, TREE._fit.h); });
+
       async function analyze() {
         const code = $("code").value.trim();
         if (!code) { status("Paste a code or upload a file first.", "warn"); return; }
@@ -91,6 +197,7 @@
           const data = await res.json();
           if (!data.ok) { status(data.error || "Analyze failed.", "err"); return; }
           $("report").srcdoc = data.html;
+          showTree(data.tree).catch((e) => console.error("tree render failed", e));
           const who = `${data.user.ascendancy || data.user.className} / ${data.user.mainSkill || "?"} (L${data.user.level})`;
           status(
             `${who} — matched against ${data.corpusSize} builds${data.engineError ? " · stats unavailable: " + data.engineError : ""}.`,
