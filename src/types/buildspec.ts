@@ -57,8 +57,9 @@ export interface Item {
   raw: string; // full multi-line PoB item text
 }
 
-/** A parsed Path of Building 2 build. */
+/** A parsed Path of Building build. */
 export interface PobBuild {
+  isPoE2: boolean; // true if root was <PathOfBuilding2> (vs PoE1 <PathOfBuilding>)
   level: number;
   className: string;
   ascendClassName: string;
@@ -119,7 +120,7 @@ export interface StatProfile {
 // Layer 2: normalized build identity (for matching) + corpus entries
 // ---------------------------------------------------------------------------
 
-export type BuildSource = "user" | "poe.ninja" | "mobalytics";
+export type BuildSource = "user" | "poe.ninja" | "mobalytics" | "pobarchives";
 
 /** The features that define a build's identity, used for matching. */
 export interface BuildSpec {

@@ -33,10 +33,16 @@ npm run typecheck   # tsc --noEmit
 npm run cli -- inspect --file fixtures/example.pob   # decode + summarise a PoB2 code
 npm run cli -- stats   --file fixtures/example.pob   # compute live stats via headless PoB2
 npm run cli -- guide   --file fixtures/example.pob   # survival guide: what you're low on + next upgrades
+
+# Build a meta-build corpus, then match your build to the closest one:
+npm run cli -- corpus  --limit 10 --league runesofaldur   # scrape pobarchives -> data/corpus.json
+npm run cli -- match   --file my.pob                       # rank closest corpus builds
 ```
 
-The `inspect`/`stats`/`guide` commands also accept a code as a positional arg
-(`npm run cli -- guide <pob2-code>`) or raw XML.
+The `inspect`/`stats`/`guide`/`match` commands also accept a code as a positional
+arg (`npm run cli -- guide <pob2-code>`) or raw XML. The corpus is built from
+pobarchives.com (mobalytics & poe.ninja are Cloudflare-gated; a headless-browser
+source is a later addition).
 
 ### Engine setup (for `stats` / live computation)
 

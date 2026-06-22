@@ -72,6 +72,7 @@ function looksLikeSupport(g: Record<string, unknown>): boolean {
 /** Parse a decoded PoB XML string into a structured PobBuild. */
 export function parsePobXml(xml: string): PobBuild {
   const doc = parser.parse(xml);
+  const isPoE2 = doc.PathOfBuilding2 !== undefined;
   const root = doc.PathOfBuilding2 ?? doc.PathOfBuilding;
   if (!root) {
     throw new Error("Not a Path of Building build (missing <PathOfBuilding2> root element)");
@@ -163,6 +164,7 @@ export function parsePobXml(xml: string): PobBuild {
   }
 
   return {
+    isPoE2,
     level: num(build["@_level"], 1),
     className: String(build["@_className"] ?? ""),
     ascendClassName: String(build["@_ascendClassName"] ?? ""),

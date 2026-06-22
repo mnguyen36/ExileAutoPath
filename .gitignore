@@ -10,5 +10,6 @@ dist/
 pob-src
 fixtures/*.local.*
 fixtures/_*
+data/
 coverage/
 *.tsbuildinfo

@@ -128,10 +128,11 @@ Defined in `src/types/buildspec.ts`.
 | `ingest/charjson` | GGG character JSON → PoB2 build | port PoB-PoE2 import mapping | med |
 | `ingest/oauth` | PKCE login → fetch character | port PoB-PoE2 flow; **needs GGG approval** | high (external) |
 | `engine/pob` | stats for any build | LuaJIT subprocess → vendored PoB-PoE2 `HeadlessWrapper.lua` | ✅ working |
-| `corpus/poeninja` | ladder builds | protobuf decode + dictionary resolve; cache | med-high |
-| `corpus/mobalytics` | guide variants | `__PRELOADED_STATE__` JSON (browser UA) | med |
+| `corpus/pobarchives` | meta builds (PoB codes) | scrape pobarchives→pobb.in, decode, filter PoE2 | ✅ working |
+| `corpus/poeninja` | ladder builds | protobuf + dictionary | ⛔ Cloudflare-gated (needs headless browser) |
+| `corpus/mobalytics` | guide variants | `__PRELOADED_STATE__` JSON | ⛔ Cloudflare JS challenge (needs headless browser) |
 | `corpus/gamedata` | tree/item/gem dictionaries | repoe-fork + GGG tree export, cached locally | low |
-| `match/matcher` | nearest meta build | weighted feature similarity + tree Jaccard | med |
+| `match/matcher` | nearest meta build | weighted feature similarity + tree Jaccard | ✅ working |
 | `plan/planner` | current vs target diff → steps | set diffs + level-band ordering + cost lookup | med |
 | `report/survival` | render guide | gap analysis over StatProfile + step list | ✅ working |
 
@@ -170,11 +171,17 @@ MaximumHitTaken, resist overcap. Tradeoff accepted: a native LuaJIT dependency
   values) — fold in when corpus/import produces real codes.
 - **Phase 2 — Game data.** Vendor/cache repoe-fork + GGG tree export. Resolve node
   ids → names/stats, gem/item names ↔ ids. Refine support-gem detection.
-- **Phase 3 — Corpus: mobalytics.** Scrape a guide → `CorpusBuild` with variants +
-  priority lists. (Easier than poe.ninja; gives upgrade-path structure first.)
-- **Phase 4 — Corpus: poe.ninja.** Capture live `search`/`tooltip`/`dictionary`
-  requests, decode protobuf → `CorpusBuild[]` per league, cached.
-- **Phase 5 — Matcher.** `BuildSpec` → ranked `MatchResult[]`.
+- **Phase 3 — Corpus** ✅ *via pobarchives* (`corpus/pobarchives.ts`, `corpus` CLI).
+  mobalytics & poe.ninja are **Cloudflare-gated** (JS challenge / bot block — curl
+  & Node fetch get "Just a moment…"), so pivoted to **pobarchives.com** (curl-friendly,
+  links pobb.in PoB codes). Discover ids → resolve pobb.in code → decode → filter PoE2
+  → `CorpusBuild`. *Later:* add mobalytics/poe.ninja via a headless browser
+  (Playwright) for variants + popularity; fold in mobalytics priority-lists for the path.
+- **Phase 4 — Corpus: poe.ninja / mobalytics (headless).** Deferred — needs a
+  browser to clear Cloudflare. Gives ladder popularity + guide upgrade-path variants.
+- **Phase 5 — Matcher** ✅ `match/matcher.ts` + `match` CLI: weighted blend of
+  ascendancy / main-skill / tree-Jaccard / uniques / weapon → ranked `MatchResult[]`
+  with reasons. Validated: real Stormweaver → closest corpus Stormweaver.
 - **Phase 6 — Planner.** Diff current vs matched target → ordered `UpgradeStep[]`.
 - **Phase 7 — Survival guide.** ✅ *Standalone gap analysis done* (`report/survival.ts`,
   `guide` CLI): flags uncapped/negative resistances, low eHP-for-level, near-full
@@ -195,6 +202,9 @@ MaximumHitTaken, resist overcap. Tradeoff accepted: a native LuaJIT dependency
 - **2026-06-21** League is a parameter; default focus Runes of Aldur.
 - **2026-06-22** Engine = LuaJIT subprocess driving vendored PoB-PoE2 (pob-web WASM
   rejected: not headless-Node-viable). Accepts a native LuaJIT dep. Feed XML, not codes.
+- **2026-06-22** Corpus source = pobarchives.com (curl-friendly → pobb.in codes), not
+  mobalytics/poe.ninja (Cloudflare JS challenge). All build data comes from decoding
+  the PoB code; pobarchives is discovery only. Filter to PoE2 by decoded root element.
 
 ---
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { decodePobCode, parsePobXml } from "./ingest/pobcode.js";
 import {
   computeStatsFromXml,
@@ -8,7 +9,10 @@ import {
   engineAvailable,
 } from "./engine/pob.js";
 import { analyzeSurvival, renderSurvivalGuide } from "./report/survival.js";
-import type { ResistProfile } from "./types/buildspec.js";
+import { pobBuildToBuildSpec } from "./ingest/buildspec.js";
+import { buildCorpus } from "./corpus/pobarchives.js";
+import { matchBuilds } from "./match/matcher.js";
+import type { ResistProfile, CorpusBuild } from "./types/buildspec.js";
 
 const program = new Command();
 
@@ -159,6 +163,70 @@ program
       return;
     }
     console.log(renderSurvivalGuide(guide));
+  });
+
+program
+  .command("corpus")
+  .description("Build a local meta-build corpus by scraping pobarchives -> pobb.in PoB2 codes")
+  .option("--league <name>", "tag builds with this league")
+  .option("--game <g>", "poe2 or poe1", "poe2")
+  .option("--limit <n>", "target number of builds to collect", "20")
+  .option("--scan <n>", "max candidates to examine (default limit*4)")
+  .option("-o, --out <path>", "output corpus JSON", "data/corpus.json")
+  .action(
+    async (opts: { league?: string; game: string; limit: string; scan?: string; out: string }) => {
+      const corpus = await buildCorpus({
+        game: opts.game,
+        league: opts.league,
+        limit: Number(opts.limit),
+        scan: opts.scan ? Number(opts.scan) : undefined,
+        onProgress: (m) => console.error(m), // progress on stderr; result path on stdout
+      });
+    mkdirSync(dirname(opts.out), { recursive: true });
+    writeFileSync(opts.out, JSON.stringify(corpus, null, 2));
+    console.log(`Saved ${corpus.length} builds to ${opts.out}`);
+  });
+
+program
+  .command("match")
+  .description("Match your build to the closest builds in the corpus")
+  .argument("[code]", "PoB2 import code (or use --file)")
+  .option("-f, --file <path>", "read your code (or raw XML) from a file")
+  .option("-c, --corpus <path>", "corpus JSON", "data/corpus.json")
+  .option("-n, --top <n>", "number of results", "5")
+  .action((code: string | undefined, opts: { file?: string; corpus: string; top: string }) => {
+    const raw = opts.file ? readFileSync(opts.file, "utf8") : code;
+    if (!raw) {
+      console.error("Provide a PoB2 code argument or --file <path>.");
+      process.exitCode = 1;
+      return;
+    }
+    const xml = raw.trimStart().startsWith("<") ? raw : decodePobCode(raw);
+    const user = pobBuildToBuildSpec(parsePobXml(xml), "user", "you");
+    let corpus: CorpusBuild[];
+    try {
+      corpus = JSON.parse(readFileSync(opts.corpus, "utf8")) as CorpusBuild[];
+    } catch {
+      console.error(`No corpus at ${opts.corpus}. Build one first:  cli corpus --out ${opts.corpus}`);
+      process.exitCode = 1;
+      return;
+    }
+    const results = matchBuilds(user, corpus, Number(opts.top));
+    console.log(
+      `You: ${user.ascendancy || user.className} / ${user.mainSkill || "?"} (L${user.level})\n`,
+    );
+    console.log(`Closest of ${corpus.length} builds:`);
+    if (results.length === 0) {
+      console.log("  (corpus is empty)");
+      return;
+    }
+    results.forEach((r, i) => {
+      const t = r.target;
+      console.log(
+        `  ${i + 1}. [${(r.score * 100).toFixed(0)}%] ${t.ascendancy || t.className} / ${t.mainSkill || "?"} (L${t.level})  ${t.sourceUrl ?? ""}`,
+      );
+      console.log(`        ${r.reasons.join("; ") || "weak match"}`);
+    });
   });
 
 program.parseAsync(process.argv);
