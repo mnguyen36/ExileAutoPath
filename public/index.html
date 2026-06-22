@@ -29,8 +29,22 @@
       #treePanel h2 { font-size: 16px; color: #caa85a; margin: 0 0 8px; }
       .legend { font-size: 12px; color: #9a958a; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
       .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
-      #tree { width: 100%; height: 580px; background: #0f1115; border: 1px solid #2a2e39; border-radius: 10px; touch-action: none; cursor: grab; display: block; }
+      .treeWrap { display: flex; gap: 12px; align-items: stretch; }
+      #tree { flex: 1; min-width: 0; height: 600px; background: #0f1115; border: 1px solid #2a2e39; border-radius: 10px; touch-action: none; cursor: grab; display: block; }
       #tree:active { cursor: grabbing; }
+      #treeSide { width: 320px; flex: none; height: 600px; overflow-y: auto; background: #1b1e26; border: 1px solid #2a2e39; border-radius: 10px; padding: 12px; font-size: 13px; }
+      #treeSide .card { background: #23262f; border: 1px solid #30343f; border-radius: 8px; padding: 10px; margin-bottom: 12px; min-height: 56px; }
+      #treeSide h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #8a857a; margin: 14px 0 6px; }
+      #treeSide .grp { font-size: 11px; color: #8a857a; margin: 8px 0 4px; }
+      .nodeName { color: #caa85a; font-weight: 600; margin-bottom: 4px; }
+      .ni { padding: 6px 8px; border-radius: 6px; margin: 4px 0; background: #23262f; cursor: pointer; border-left: 3px solid #3a3f4d; }
+      .ni:hover { background: #2a2e39; }
+      .ni.k { border-left-color: #9a7fc0; }
+      .ni.t { border-left-color: #59617a; }
+      .ni.add { border-left-color: #5fae7a; }
+      .ni b { color: #e7e3d6; }
+      .ni small { color: #9a958a; display: block; }
+      @media (max-width: 720px) { .treeWrap { flex-direction: column; } #treeSide { width: auto; height: 260px; } }
       #tree .edges { stroke: #262b37; stroke-width: 8; fill: none; }
       #tree .edgesAdd { stroke: #3f6b50; stroke-width: 14; fill: none; }
       #tree circle.n { fill: #353b49; }
@@ -66,15 +80,22 @@
           <span><i style="background:#9a7fc0"></i>keystone</span>
           <span><i style="background:#59617a"></i>notable</span>
           <button id="fit">Fit</button>
-          <span class="hint">scroll to zoom · drag to pan</span>
+          <span class="hint">scroll to zoom · drag to pan · hover/click a node</span>
         </div>
-        <svg id="tree" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="treeWrap">
+          <svg id="tree" preserveAspectRatio="xMidYMid meet"></svg>
+          <aside id="treeSide">
+            <div id="nodeDetail" class="card"><span class="hint">Hover or click a node to see its stats.</span></div>
+            <div id="nodeSummary"></div>
+          </aside>
+        </div>
       </div>
     </div>
 
     <script type="module">
       const $ = (id) => document.getElementById(id);
       const status = (msg, cls = "") => { $("status").className = "status " + cls; $("status").textContent = msg; };
+      const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
       // Populate leagues + engine hint.
       try {
@@ -146,9 +167,10 @@
           else if (n.k) { cls = "nk"; r = 42; }
           else if (n.t) { cls = "nn"; r = 26; }
           const title = (n.n || "").replace(/[<&>]/g, "");
-          circles += `<circle class="${cls}" cx="${n.x}" cy="${n.y}" r="${r}">${title ? `<title>${title}</title>` : ""}</circle>`;
+          circles += `<circle class="${cls}" cx="${n.x}" cy="${n.y}" r="${r}" data-id="${n.id}">${title ? `<title>${title}</title>` : ""}</circle>`;
         }
         svg.innerHTML = `<path class="edges" d="${base}"/><path class="edgesAdd" d="${add}"/>${circles}`;
+        buildSummary(t, tree.userNodes, tree.targetNodes || []);
 
         const focus = t.nodes.filter((n) => inSet(n.id));
         let bb;
@@ -182,6 +204,57 @@
       });
       svg.addEventListener("pointerup", () => (drag = null));
       $("fit").addEventListener("click", () => { if (TREE && TREE._fit) setViewBox(TREE._fit.x, TREE._fit.y, TREE._fit.w, TREE._fit.h); });
+
+      function showDetail(node) {
+        if (!node) return;
+        const stats = node.d && node.d.length
+          ? node.d.map((s) => `<div>${esc(s)}</div>`).join("")
+          : '<span class="hint">no listed stats</span>';
+        const tag = node.k ? " · keystone" : node.t ? " · notable" : "";
+        $("nodeDetail").innerHTML = `<div class="nodeName">${esc(node.n || "Node " + node.id)}${tag}</div>${stats}`;
+      }
+      function panTo(node) {
+        if (!node || !vb) return;
+        const w = 4200, h = w * (vb.h / vb.w);
+        setViewBox(node.x - w / 2, node.y - h / 2, w, h);
+      }
+      function nodeLine(node, extraCls) {
+        const stats = (node.d || []).map((s) => `<small>${esc(s)}</small>`).join("");
+        const cls = node.k ? "k" : node.t ? "t" : "";
+        return `<div class="ni ${cls} ${extraCls || ""}" data-id="${node.id}"><b>${esc(node.n || "Node " + node.id)}</b>${stats}</div>`;
+      }
+      function buildSummary(t, userNodes, targetNodes) {
+        const uSet = new Set(userNodes);
+        const u = userNodes.map((id) => t.byId.get(id)).filter(Boolean);
+        const tg = targetNodes.map((id) => t.byId.get(id)).filter(Boolean);
+        const keys = u.filter((n) => n.k);
+        const nots = u.filter((n) => n.t && !n.k);
+        const smalls = u.length - keys.length - nots.length;
+        const adds = tg.filter((n) => !uSet.has(n.id) && (n.k || n.t));
+        let h = `<h3>Your allocation · ${u.length} points</h3>`;
+        if (keys.length) h += `<div class="grp">Keystones (${keys.length})</div>` + keys.map((n) => nodeLine(n)).join("");
+        if (nots.length) h += `<div class="grp">Notables (${nots.length})</div>` + nots.map((n) => nodeLine(n)).join("");
+        h += `<div class="grp">+ ${smalls} small / attribute nodes</div>`;
+        if (adds.length) {
+          h += `<h3>#1 build adds · ${adds.length} key nodes</h3>` + adds.map((n) => nodeLine(n, "add")).join("");
+        }
+        $("nodeSummary").innerHTML = h;
+      }
+      svg.addEventListener("mouseover", (e) => {
+        const id = e.target && e.target.getAttribute && e.target.getAttribute("data-id");
+        if (id && TREE) showDetail(TREE.byId.get(+id));
+      });
+      svg.addEventListener("click", (e) => {
+        const id = e.target && e.target.getAttribute && e.target.getAttribute("data-id");
+        if (id && TREE) showDetail(TREE.byId.get(+id));
+      });
+      $("nodeSummary").addEventListener("click", (e) => {
+        const el = e.target.closest(".ni");
+        if (!el || !TREE) return;
+        const node = TREE.byId.get(+el.getAttribute("data-id"));
+        showDetail(node);
+        panTo(node);
+      });
 
       async function analyze() {
         const code = $("code").value.trim();

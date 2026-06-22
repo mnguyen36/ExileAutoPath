@@ -52,6 +52,13 @@ for id, node in pairs(tree.nodes) do
       if node.isKeystone then parts[#parts + 1] = ',"k":1' end
       if node.isNotable then parts[#parts + 1] = ',"t":1' end
       if node.name and node.name ~= "" then parts[#parts + 1] = ',"n":' .. jstr(node.name) end
+      if type(node.stats) == "table" then
+        local sd = {}
+        for _, line in ipairs(node.stats) do
+          if type(line) == "string" and line ~= "" then sd[#sd + 1] = jstr(line) end
+        end
+        if #sd > 0 then parts[#parts + 1] = ',"d":[' .. table.concat(sd, ",") .. "]" end
+      end
       local cs = {}
       if type(node.connections) == "table" then
         for _, conn in pairs(node.connections) do
