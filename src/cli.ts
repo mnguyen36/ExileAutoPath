@@ -2,6 +2,12 @@
 import { Command } from "commander";
 import { readFileSync } from "node:fs";
 import { decodePobCode, parsePobXml } from "./ingest/pobcode.js";
+import {
+  computeStatsFromXml,
+  computeStatsFromCode,
+  engineAvailable,
+} from "./engine/pob.js";
+import type { ResistProfile } from "./types/buildspec.js";
 
 const program = new Command();
 
@@ -51,6 +57,67 @@ program
       console.log(`Cached stats: ${preview}${cached.length > 8 ? " …" : ""}`);
       console.log("  (note: these are baked into the code; real stats come from the PoB engine)");
     }
+  });
+
+program
+  .command("stats")
+  .description("Compute live stats for a build via the headless Path of Building 2 engine")
+  .argument("[code]", "PoB2 import code (or use --file)")
+  .option("-f, --file <path>", "read the code (or raw XML) from a file")
+  .option("--json", "print the full StatProfile as JSON")
+  .action((code: string | undefined, opts: { file?: string; json?: boolean }) => {
+    if (!engineAvailable()) {
+      console.error(
+        "PoB engine unavailable. Needs LuaJIT (set POB_LUAJIT) and .vendor/PathOfBuilding-PoE2.\n" +
+          "See docs/ARCHITECTURE.md (Engine).",
+      );
+      process.exitCode = 1;
+      return;
+    }
+    const raw = opts.file ? readFileSync(opts.file, "utf8") : code;
+    if (!raw) {
+      console.error("Provide a PoB2 code argument or --file <path>.");
+      process.exitCode = 1;
+      return;
+    }
+    const isXml = raw.trimStart().startsWith("<");
+    const result = isXml ? computeStatsFromXml(raw) : computeStatsFromCode(raw);
+    if (!result.ok) {
+      console.error("Engine error:", result.error ?? "unknown");
+      process.exitCode = 1;
+      return;
+    }
+    const s = result.stats;
+    if (opts.json) {
+      console.log(JSON.stringify(s, null, 2));
+      return;
+    }
+    const f = (x?: number, d = 0) =>
+      x === undefined ? "—" : x.toLocaleString("en-US", { maximumFractionDigits: d });
+    // Cold/Chaos both start with C, so use disambiguated short labels.
+    const SHORT: Record<string, string> = {
+      Physical: "Phys",
+      Fire: "Fire",
+      Cold: "Cold",
+      Lightning: "Lght",
+      Chaos: "Chao",
+    };
+    const resistLine = (Object.entries(s.resists) as [string, ResistProfile | undefined][])
+      .filter((e): e is [string, ResistProfile] => e[1] !== undefined)
+      .map(([el, r]) => `${SHORT[el] ?? el} ${r.current}/${r.max}${r.overcap > 0 ? `(+${r.overcap})` : ""}`)
+      .join("  ");
+    const hitLine = Object.entries(s.maxHitTaken)
+      .map(([t, v]) => `${SHORT[t] ?? t} ${f(v)}`)
+      .join("  ");
+
+    console.log(`Computed via headless PoB2 (${result.rawCount} raw stats)\n`);
+    console.log(`DPS:      Total ${f(s.totalDPS)}    Full ${f(s.fullDPS)}`);
+    console.log(`Pools:    Life ${f(s.life)}   ES ${f(s.energyShield)}   Ward ${f(s.ward)}   Mana ${f(s.mana)}`);
+    console.log(`Spirit:   ${f(s.spirit)} (reserved ${f(s.spiritReserved)})`);
+    console.log(`Defence:  Armour ${f(s.armour)}   Evasion ${f(s.evasion)}   Block ${f(s.blockChance)}%`);
+    console.log(`Resists:  ${resistLine || "—"}`);
+    console.log(`Max hit:  ${hitLine || "—"}    TotalEHP ${f(s.totalEHP)}`);
+    console.log(`Stun threshold: ${f(s.stunThreshold)}`);
   });
 
 program.parseAsync(process.argv);

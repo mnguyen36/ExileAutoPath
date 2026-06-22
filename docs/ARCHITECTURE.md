@@ -127,7 +127,7 @@ Defined in `src/types/buildspec.ts`.
 | `ingest/pobcode` | decode/parse PoB2 codes | base64url + zlib + fast-xml-parser | low ✅ built |
 | `ingest/charjson` | GGG character JSON → PoB2 build | port PoB-PoE2 import mapping | med |
 | `ingest/oauth` | PKCE login → fetch character | port PoB-PoE2 flow; **needs GGG approval** | high (external) |
-| `engine/pob` | stats for any build | pob-web WASM in Node; LuaJIT subprocess fallback | **highest** |
+| `engine/pob` | stats for any build | LuaJIT subprocess → vendored PoB-PoE2 `HeadlessWrapper.lua` | ✅ working |
 | `corpus/poeninja` | ladder builds | protobuf decode + dictionary resolve; cache | med-high |
 | `corpus/mobalytics` | guide variants | `__PRELOADED_STATE__` JSON (browser UA) | med |
 | `corpus/gamedata` | tree/item/gem dictionaries | repoe-fork + GGG tree export, cached locally | low |
@@ -135,11 +135,27 @@ Defined in `src/types/buildspec.ts`.
 | `plan/planner` | current vs target diff → steps | set diffs + level-band ordering + cost lookup | med |
 | `report/survival` | render guide | gap analysis over StatProfile + step list | low |
 
-**Engine decision:** chosen stack is TypeScript/Node + `pob-web` WASM so one
-language spans engine and (future) UI, and no Lua toolchain is required (none is
-installed locally). The headless stat extraction is the project's #1 risk; if
-pob-web-in-Node proves impractical, fall back to driving real PoB-PoE2 via a
-bundled LuaJIT subprocess. **This is the next thing to spike.**
+**Engine decision (resolved 2026-06-22, Phase 1 spike):** `pob-web`'s WASM is
+**not** headless-Node-viable without a major fork (browser-bound driver; never
+exports stat numbers — confirmed by inspection). So we drive the **real**
+PoB-PoE2 engine via a **LuaJIT subprocess**, which works today:
+
+- LuaJIT from winget `DEVCOM.LuaJIT` (2.1) at `%LOCALAPPDATA%\Programs\LuaJIT\bin\luajit.exe`.
+- Vendored `PathOfBuilding-PoE2` under `.vendor/` (gitignored).
+- `src/engine/lua/headless_stats.lua` runs with cwd = `<PoB>/src`, sets
+  `package.path` (`../runtime/lua/?.lua`) and `package.cpath` (`../runtime/?.dll`
+  — PoB's Windows runtime DLLs are ABI-compatible with this LuaJIT; that's how
+  `require('lua-utf8')` → `lua-utf8.dll`/`luaopen_utf8` resolves), `dofile`s
+  `HeadlessWrapper.lua`, `loadBuildFromXML(xml)`, then dumps every scalar in
+  `build.calcsTab.{mainOutput,calcsOutput}` as JSON.
+- We feed **XML** (decoded Node-side) because the wrapper stubs `Deflate`/`Inflate`.
+- `src/engine/pob.ts` spawns it (stdin closed so a failed boot's `io.read` can't
+  hang), parses the JSON, and maps known keys → `StatProfile`. Resist cap is
+  `current + MissingResist`; per-type eHP from `*MaximumHitTaken` + `TotalEHP`.
+
+Result: empty build → 624 numeric stats incl. Spirit, StunThreshold, per-type
+MaximumHitTaken, resist overcap. Tradeoff accepted: a native LuaJIT dependency
+(vs the pure-WASM original pick).
 
 ---
 
@@ -147,9 +163,11 @@ bundled LuaJIT subprocess. **This is the next thing to spike.**
 
 - **Phase 0 — Scaffold** ✅ repo, TS/Node toolchain, data model, PoB2 code
   decode/parse + tests, `inspect` CLI.
-- **Phase 1 — Engine spike (next).** Stand up `engine/pob`: feed a real PoB2 code,
-  get back a `StatProfile`. Validate pob-web under Node; decide engine path. Add a
-  real PoB2 export to `fixtures/`. *Exit:* `compute(code) → StatProfile` works.
+- **Phase 1 — Engine spike** ✅ `engine/pob` computes a `StatProfile` from a PoB2
+  code/XML via headless PoB-PoE2 (LuaJIT subprocess). `inspect` + `stats` CLI
+  commands; guarded integration test. *Remaining:* validate numbers against a
+  **real** PoB2 export (synthetic fixture gives structurally-correct but trivial
+  values) — fold in when corpus/import produces real codes.
 - **Phase 2 — Game data.** Vendor/cache repoe-fork + GGG tree export. Resolve node
   ids → names/stats, gem/item names ↔ ids. Refine support-gem detection.
 - **Phase 3 — Corpus: mobalytics.** Scrape a guide → `CorpusBuild` with variants +
@@ -172,13 +190,16 @@ bundled LuaJIT subprocess. **This is the next thing to spike.**
 - **2026-06-21** Embed PoB-PoE2 for stats; never reimplement the calc engine.
 - **2026-06-21** Import is paste-first; OAuth is a parallel, non-blocking track.
 - **2026-06-21** League is a parameter; default focus Runes of Aldur.
+- **2026-06-22** Engine = LuaJIT subprocess driving vendored PoB-PoE2 (pob-web WASM
+  rejected: not headless-Node-viable). Accepts a native LuaJIT dep. Feed XML, not codes.
 
 ---
 
 ## 8. Open questions / risks
 
-- **pob-web under Node**: built for the browser — confirm it runs headless in Node,
-  or vendor a LuaJIT + PoB-PoE2 checkout and shell out. (Phase 1 resolves this.)
+- ~~pob-web under Node~~ **RESOLVED (Phase 1):** not viable; using LuaJIT subprocess
+  + vendored PoB-PoE2 (see Components). New risk: engine setup is a manual step
+  (install LuaJIT, clone PoB-PoE2) — needs a setup script before distribution.
 - **poe.ninja protobuf**: exact `version`+`overview` request pairing must be
   captured from a live browser session; schema is undocumented and may change.
 - **Scraper fragility**: mobalytics `__PRELOADED_STATE__` and poe.ninja API are

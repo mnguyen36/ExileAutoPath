@@ -28,10 +28,28 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design, data sou
 
 ```bash
 npm install
-npm test            # vitest
+npm test            # vitest (engine integration test auto-skips if no engine)
 npm run typecheck   # tsc --noEmit
-npm run cli -- inspect --file fixtures/example.pob   # summarise a PoB2 code
+npm run cli -- inspect --file fixtures/example.pob   # decode + summarise a PoB2 code
+npm run cli -- stats   --file fixtures/example.pob   # compute live stats via headless PoB2
 ```
+
+### Engine setup (for `stats` / live computation)
+
+Stats are computed by driving the real Path of Building 2 engine headless via a
+LuaJIT subprocess. One-time setup on Windows:
+
+```bash
+winget install --id DEVCOM.LuaJIT          # LuaJIT 2.1
+git clone --depth 1 -b dev \
+  https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2.git \
+  .vendor/PathOfBuilding-PoE2
+```
+
+Defaults auto-detect LuaJIT at `%LOCALAPPDATA%\Programs\LuaJIT\bin\luajit.exe`
+and PoB at `.vendor/PathOfBuilding-PoE2/src`. Override with `POB_LUAJIT` /
+`POB_SRC`. If the engine isn't present, `stats` reports it and the integration
+test skips.
 
 ## Layout
 

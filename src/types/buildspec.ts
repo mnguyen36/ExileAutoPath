@@ -80,9 +80,11 @@ export interface PobBuild {
 export type MaxHitTaken = Partial<Record<DamageType, number>>;
 
 export interface ResistProfile {
-  current: number; // effective value PoB reports (after endgame penalty)
-  max: number; // cap (75 default, up to 90 with +max res)
-  overcap: number; // current - max; negative => under cap
+  current: number; // effective value PoB reports, clamped to the cap (after endgame penalty)
+  total: number; // uncapped total
+  max: number; // the cap (75 default, up to 90 with +max res). max = current + missing
+  overcap: number; // wasted resistance above the cap (>= 0)
+  missing: number; // how far below the cap (>= 0); 0 once capped
 }
 
 /** The stats ExileAutoPath surfaces, read from the PoB engine output table. */
@@ -106,6 +108,7 @@ export interface StatProfile {
   resists: Partial<Record<ElementalResist, ResistProfile>>;
   // survivability per damage type
   maxHitTaken: MaxHitTaken;
+  totalEHP?: number; // PoB's blended TotalEHP
   // stun (a first-class defensive axis in PoE2)
   stunThreshold?: number;
   // everything PoB emitted, for flexibility

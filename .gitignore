@@ -9,5 +9,6 @@ dist/
 # never committed. Engine vendoring (PoE2 fork / pob-web) goes under .vendor/.
 pob-src
 fixtures/*.local.*
+fixtures/_*
 coverage/
 *.tsbuildinfo
