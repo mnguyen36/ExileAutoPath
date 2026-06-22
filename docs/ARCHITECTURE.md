@@ -133,7 +133,7 @@ Defined in `src/types/buildspec.ts`.
 | `corpus/mobalytics` | guide variants | `__PRELOADED_STATE__` JSON | ⛔ Cloudflare JS challenge (needs headless browser) |
 | `corpus/gamedata` | tree/item/gem dictionaries | repoe-fork + GGG tree export, cached locally | low |
 | `match/matcher` | nearest meta build | weighted feature similarity + tree Jaccard | ✅ working |
-| `plan/planner` | current vs target diff → steps | set diffs + level-band ordering + cost lookup | med |
+| `plan/planner` | current vs target diff → steps | tree node-set diff + skill/item diff | ✅ working |
 | `report/survival` | render guide | gap analysis over StatProfile + step list | ✅ working |
 
 **Engine decision (resolved 2026-06-22, Phase 1 spike):** `pob-web`'s WASM is
@@ -182,7 +182,12 @@ MaximumHitTaken, resist overcap. Tradeoff accepted: a native LuaJIT dependency
 - **Phase 5 — Matcher** ✅ `match/matcher.ts` + `match` CLI: weighted blend of
   ascendancy / main-skill / tree-Jaccard / uniques / weapon → ranked `MatchResult[]`
   with reasons. Validated: real Stormweaver → closest corpus Stormweaver.
-- **Phase 6 — Planner.** Diff current vs matched target → ordered `UpgradeStep[]`.
+- **Phase 6 — Planner** ✅ `plan/planner.ts`: diff current vs matched target →
+  tree node-set delta (allocate/refund counts), skills/supports to acquire, uniques
+  to buy → ordered `UpgradeStep[]`. The `plan` CLI command unifies Phases 5–7 into one
+  report (closest build + path + survival). Validated on the real Stormweaver build.
+  *Later:* per-step cost estimates (price source) and level-band ordering once game
+  data + a price feed land.
 - **Phase 7 — Survival guide.** ✅ *Standalone gap analysis done* (`report/survival.ts`,
   `guide` CLI): flags uncapped/negative resistances, low eHP-for-level, near-full
   Spirit reservation, missing mitigation layer, weakest damage type; emits gap-driven

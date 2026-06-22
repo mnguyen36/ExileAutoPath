@@ -12,7 +12,16 @@ import { analyzeSurvival, renderSurvivalGuide } from "./report/survival.js";
 import { pobBuildToBuildSpec } from "./ingest/buildspec.js";
 import { buildCorpus } from "./corpus/pobarchives.js";
 import { matchBuilds } from "./match/matcher.js";
+import { planPath, renderBuildPath } from "./plan/planner.js";
 import type { ResistProfile, CorpusBuild } from "./types/buildspec.js";
+
+function loadCorpus(path: string): CorpusBuild[] | null {
+  try {
+    return JSON.parse(readFileSync(path, "utf8")) as CorpusBuild[];
+  } catch {
+    return null;
+  }
+}
 
 const program = new Command();
 
@@ -227,6 +236,58 @@ program
       );
       console.log(`        ${r.reasons.join("; ") || "weak match"}`);
     });
+  });
+
+program
+  .command("plan")
+  .description("Full report: closest meta build, the path to it, and what you're low on")
+  .argument("[code]", "PoB2 import code (or use --file)")
+  .option("-f, --file <path>", "read your code (or raw XML) from a file")
+  .option("-c, --corpus <path>", "corpus JSON", "data/corpus.json")
+  .action((code: string | undefined, opts: { file?: string; corpus: string }) => {
+    const raw = opts.file ? readFileSync(opts.file, "utf8") : code;
+    if (!raw) {
+      console.error("Provide a PoB2 code argument or --file <path>.");
+      process.exitCode = 1;
+      return;
+    }
+    const xml = raw.trimStart().startsWith("<") ? raw : decodePobCode(raw);
+    const build = parsePobXml(xml);
+    const user = pobBuildToBuildSpec(build, "user", "you");
+
+    console.log(
+      `You: ${build.className}${build.ascendClassName ? ` (${build.ascendClassName})` : ""} / ${user.mainSkill || "?"} — level ${build.level}\n`,
+    );
+
+    const corpus = loadCorpus(opts.corpus);
+    if (!corpus) {
+      console.error(`No corpus at ${opts.corpus}. Build one first:  cli corpus --out ${opts.corpus}`);
+      process.exitCode = 1;
+      return;
+    }
+    const best = matchBuilds(user, corpus, 1)[0];
+    if (!best) {
+      console.log("Corpus is empty — nothing to match against.");
+    } else {
+      console.log(renderBuildPath(planPath(build, best)));
+    }
+
+    // Survivability (needs the engine).
+    if (engineAvailable()) {
+      const result = computeStatsFromXml(xml);
+      if (result.ok) {
+        const guide = analyzeSurvival(result.stats, {
+          level: build.level,
+          className: build.className,
+          ascendancy: build.ascendClassName,
+        });
+        console.log("\n" + renderSurvivalGuide(guide));
+      } else {
+        console.log(`\n(could not compute stats: ${result.error ?? "unknown"})`);
+      }
+    } else {
+      console.log("\n(install the PoB engine for the survivability section — see README)");
+    }
   });
 
 program.parseAsync(process.argv);

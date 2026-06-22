@@ -5,9 +5,11 @@ real meta build, and get a **path to the final build** — which passives to tak
 gems to acquire, what to buy next — plus a **survival guide** that tells you which stats
 you're low on.
 
-> Status: **early scaffold (v0.1)**. Working today: decode + parse a Path of Building 2
-> import code. Everything else is specified in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-> and being built in phases.
+> Status: **working MVP (v0.1)**. The full loop runs today: import a PoB2 code →
+> compute real stats via headless Path of Building 2 → match to the closest build in
+> a scraped corpus → lay out the path to it → flag what you're low on. Remaining work
+> (game-data dictionaries for node/item names, cost estimates, headless-browser corpus
+> sources, OAuth account import) is tracked in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Why it works the way it does
 
@@ -34,10 +36,15 @@ npm run cli -- inspect --file fixtures/example.pob   # decode + summarise a PoB2
 npm run cli -- stats   --file fixtures/example.pob   # compute live stats via headless PoB2
 npm run cli -- guide   --file fixtures/example.pob   # survival guide: what you're low on + next upgrades
 
-# Build a meta-build corpus, then match your build to the closest one:
+# Build a meta-build corpus, then match / plan against it:
 npm run cli -- corpus  --limit 10 --league runesofaldur   # scrape pobarchives -> data/corpus.json
 npm run cli -- match   --file my.pob                       # rank closest corpus builds
+npm run cli -- plan    --file my.pob                       # closest build + path to it + survival guide
 ```
+
+`plan` is the full report: it imports your build, finds the closest build in the
+corpus, lays out the path to reach it (skills/uniques to get, tree re-spec), and
+flags what you're low on right now.
 
 The `inspect`/`stats`/`guide`/`match` commands also accept a code as a positional
 arg (`npm run cli -- guide <pob2-code>`) or raw XML. The corpus is built from

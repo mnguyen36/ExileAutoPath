@@ -193,3 +193,16 @@ export interface SurvivalGuide {
   gaps: StatGap[];
   path: UpgradeStep[];
 }
+
+/** The plan to move a current build toward a matched target build. */
+export interface BuildPath {
+  target: CorpusBuild;
+  matchScore: number;
+  matchReasons: string[];
+  treeToAllocate: number; // target nodes the user hasn't allocated
+  treeToRefund: number; // user nodes not in the target tree
+  skillsToAcquire: string[]; // active skills the target uses that the user lacks
+  supportsToAdd: string[]; // support gems the target uses that the user lacks
+  uniquesToBuy: string[]; // target key uniques the user lacks
+  steps: UpgradeStep[];
+}
