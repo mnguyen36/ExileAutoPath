@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.log
+.env
+.env.*
+.DS_Store
+.vendor/
+# Incidental clone left by research (PoE1 PoB source). Kept on disk for reference,
+# never committed. Engine vendoring (PoE2 fork / pob-web) goes under .vendor/.
+pob-src
+fixtures/*.local.*
+coverage/
+*.tsbuildinfo

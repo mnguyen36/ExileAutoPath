@@ -1,0 +1,37 @@
+{
+  "name": "exileautopath",
+  "version": "0.1.0",
+  "description": "PoE2 auto-builder: import your character, match the closest meta build, and plan the path (passives, gems, items) with a survival guide.",
+  "type": "module",
+  "bin": {
+    "exileautopath": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "cli": "tsx src/cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "poe2",
+    "path-of-exile-2",
+    "path-of-building",
+    "build-planner"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^12.1.0",
+    "fast-xml-parser": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

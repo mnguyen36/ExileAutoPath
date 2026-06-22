@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PathOfBuilding2>
+  <Build level="92" className="Ranger" ascendClassName="Deadeye" mainSocketGroup="1">
+    <PlayerStat stat="Life" value="3120"/>
+    <PlayerStat stat="EnergyShield" value="410"/>
+    <PlayerStat stat="TotalDPS" value="845210.5"/>
+    <PlayerStat stat="FireResist" value="75"/>
+    <PlayerStat stat="ColdResist" value="76"/>
+    <PlayerStat stat="LightningResist" value="71"/>
+    <PlayerStat stat="ChaosResist" value="-12"/>
+    <PlayerStat stat="Spirit" value="100"/>
+  </Build>
+  <Skills>
+    <SkillSet>
+      <Skill mainActiveSkill="1" enabled="true">
+        <Gem nameSpec="Lightning Arrow" skillId="LightningArrow" level="20" quality="20" enabled="true"/>
+        <Gem nameSpec="Martial Tempo" skillId="SupportMartialTempo" level="1" quality="0" enabled="true"/>
+        <Gem nameSpec="Lightning Infusion" skillId="SupportLightningInfusion" level="1" quality="0" enabled="true"/>
+      </Skill>
+    </SkillSet>
+  </Skills>
+  <Tree activeSpec="1">
+    <Spec title="Default" treeVersion="0_5" classId="3" ascendClassId="1" nodes="123,456,789,1011,1213"/>
+  </Tree>
+  <Items activeItemSet="1">
+    <Item id="1">Rarity: UNIQUE
+Quill Rain
+Short Bow</Item>
+    <ItemSet id="1">
+      <Slot name="Weapon 1" itemId="1"/>
+    </ItemSet>
+  </Items>
+</PathOfBuilding2>
