@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ExileAutoPath — PoE2 build path</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font: 15px/1.5 system-ui, Segoe UI, Roboto, sans-serif; background: #13151a; color: #e7e3d6; }
+      header { padding: 20px; border-bottom: 1px solid #2a2e39; }
+      header h1 { margin: 0; font-size: 20px; color: #caa85a; }
+      header p { margin: 2px 0 0; color: #9a958a; font-size: 13px; }
+      .wrap { max-width: 920px; margin: 0 auto; padding: 20px; }
+      .panel { background: #1b1e26; border: 1px solid #2a2e39; border-radius: 10px; padding: 16px; }
+      textarea { width: 100%; height: 96px; resize: vertical; background: #23262f; color: #e7e3d6; border: 1px solid #30343f; border-radius: 8px; padding: 10px; font: 12px/1.4 ui-monospace, Consolas, monospace; }
+      .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+      button, select, label.file { background: #2a2e39; color: #e7e3d6; border: 1px solid #3a3f4d; border-radius: 8px; padding: 8px 14px; cursor: pointer; font-size: 14px; }
+      button.primary { background: #caa85a; color: #1b1207; border-color: #caa85a; font-weight: 600; }
+      button:disabled { opacity: 0.5; cursor: default; }
+      label.file input { display: none; }
+      .hint { color: #8a857a; font-size: 12px; }
+      .status { margin-top: 10px; font-size: 13px; min-height: 18px; }
+      .status.err { color: #ff9b9b; }
+      .status.warn { color: #e6cf94; }
+      iframe { width: 100%; min-height: 720px; border: 1px solid #2a2e39; border-radius: 10px; margin-top: 16px; background: #13151a; }
+      a { color: #6fa8d6; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>ExileAutoPath</h1>
+      <p>Paste your Path of Building 2 code (or upload a file) to find the closest meta build, the path to it, and what you're low on.</p>
+    </header>
+    <div class="wrap">
+      <div class="panel">
+        <textarea id="code" placeholder="Paste your Path of Building 2 import code here…&#10;(In PoB2: Import/Export → Generate/Copy. Or paste a pobb.in / mobalytics build code.)"></textarea>
+        <div class="row">
+          <label class="file">Upload .txt / .pob<input type="file" id="file" accept=".txt,.pob,.xml,text/plain" /></label>
+          <select id="league" title="League corpus"></select>
+          <button class="primary" id="go">Analyze ▸</button>
+          <span class="hint" id="engineHint"></span>
+        </div>
+        <div class="status" id="status"></div>
+      </div>
+      <iframe id="report" title="report" sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe>
+    </div>
+
+    <script type="module">
+      const $ = (id) => document.getElementById(id);
+      const status = (msg, cls = "") => { $("status").className = "status " + cls; $("status").textContent = msg; };
+
+      // Populate leagues + engine hint.
+      try {
+        const [leagues, health] = await Promise.all([
+          fetch("/api/leagues").then((r) => r.json()),
+          fetch("/api/health").then((r) => r.json()),
+        ]);
+        const sel = $("league");
+        if (!leagues.leagues.length) {
+          sel.innerHTML = '<option value="">(no corpus — run: npm run cli -- corpus)</option>';
+        } else {
+          sel.innerHTML = leagues.leagues
+            .map((l) => `<option value="${l.name}">${l.name} (${l.builds})</option>`)
+            .join("");
+        }
+        if (!health.engine) $("engineHint").textContent = "engine offline — stats/survival disabled";
+      } catch {
+        status("Could not reach the server.", "err");
+      }
+
+      // File upload -> fill the textarea.
+      $("file").addEventListener("change", async (e) => {
+        const f = e.target.files?.[0];
+        if (!f) return;
+        $("code").value = (await f.text()).trim();
+        status(`Loaded ${f.name}.`);
+      });
+
+      async function analyze() {
+        const code = $("code").value.trim();
+        if (!code) { status("Paste a code or upload a file first.", "warn"); return; }
+        $("go").disabled = true;
+        status("Analyzing… (computing stats can take a couple of seconds)");
+        try {
+          const res = await fetch("/api/analyze", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ code, league: $("league").value || undefined }),
+          });
+          const data = await res.json();
+          if (!data.ok) { status(data.error || "Analyze failed.", "err"); return; }
+          $("report").srcdoc = data.html;
+          const who = `${data.user.ascendancy || data.user.className} / ${data.user.mainSkill || "?"} (L${data.user.level})`;
+          status(
+            `${who} — matched against ${data.corpusSize} builds${data.engineError ? " · stats unavailable: " + data.engineError : ""}.`,
+            data.engineError ? "warn" : "",
+          );
+        } catch (err) {
+          status("Request failed: " + err, "err");
+        } finally {
+          $("go").disabled = false;
+        }
+      }
+      $("go").addEventListener("click", analyze);
+      $("code").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) analyze(); });
+    </script>
+  </body>
+</html>

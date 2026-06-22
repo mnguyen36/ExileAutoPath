@@ -5,7 +5,7 @@
 // stats back into a StatProfile. We feed XML (decoded on the Node side) because
 // HeadlessWrapper stubs Deflate/Inflate, so the engine can't decode codes itself.
 
-import { spawnSync } from "node:child_process";
+import { spawnSync, spawn } from "node:child_process";
 import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
@@ -117,6 +117,74 @@ export function computeStatsFromXml(xml: string, cfg: EngineConfig = {}): Engine
 /** Compute a StatProfile from a PoB2 import code (decodes, then runs the engine). */
 export function computeStatsFromCode(code: string, cfg: EngineConfig = {}): EngineResult {
   return computeStatsFromXml(decodePobCode(code), cfg);
+}
+
+function payloadToResult(payload: BridgePayload): EngineResult {
+  const raw: Record<string, number> = {};
+  for (const [k, v] of Object.entries(payload.stats)) {
+    if (typeof v === "number") raw[k] = v;
+  }
+  return { ok: payload.ok, error: payload.error, rawCount: Object.keys(raw).length, stats: toStatProfile(raw) };
+}
+
+/** Async variant — does not block the event loop (for the server). */
+export function computeStatsFromXmlAsync(xml: string, cfg: EngineConfig = {}): Promise<EngineResult> {
+  const { luajitPath, pobSrcDir, timeoutMs } = resolveConfig(cfg);
+  return new Promise<EngineResult>((resolve, reject) => {
+    const tmp = mkdtempSync(join(tmpdir(), "exileautopath-"));
+    const inPath = join(tmp, "build.xml");
+    const outPath = join(tmp, "stats.json");
+    const cleanup = () => rmSync(tmp, { recursive: true, force: true });
+    try {
+      writeFileSync(inPath, xml, "utf8");
+    } catch (e) {
+      cleanup();
+      return reject(e as Error);
+    }
+    const child = spawn(luajitPath, [LUA_BRIDGE, inPath, outPath], {
+      cwd: pobSrcDir,
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => child.kill(), timeoutMs);
+    child.stdout?.on("data", (d) => (stdout += d));
+    child.stderr?.on("data", (d) => (stderr += d));
+    child.on("error", (e) => {
+      clearTimeout(timer);
+      cleanup();
+      const err = e as NodeJS.ErrnoException;
+      reject(
+        err.code === "ENOENT"
+          ? new Error(`LuaJIT not found at "${luajitPath}". Install it or set POB_LUAJIT.`)
+          : err,
+      );
+    });
+    child.on("close", () => {
+      clearTimeout(timer);
+      try {
+        let payload: BridgePayload;
+        try {
+          payload = JSON.parse(readFileSync(outPath, "utf8")) as BridgePayload;
+        } catch {
+          throw new Error(
+            `PoB engine produced no parseable output.\n--- stdout ---\n${stdout}\n--- stderr ---\n${stderr}`,
+          );
+        }
+        resolve(payloadToResult(payload));
+      } catch (e) {
+        reject(e as Error);
+      } finally {
+        cleanup();
+      }
+    });
+  });
+}
+
+/** Async variant of computeStatsFromCode. */
+export function computeStatsFromCodeAsync(code: string, cfg: EngineConfig = {}): Promise<EngineResult> {
+  return computeStatsFromXmlAsync(decodePobCode(code), cfg);
 }
 
 const ELEMENTS: readonly ElementalResist[] = ["Fire", "Cold", "Lightning", "Chaos"];

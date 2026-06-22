@@ -165,13 +165,14 @@ approval — so the web app launches without OAuth and gains it later.
 
 ## 6. Build plan (phased)
 
-- **W1 — extract `analyze()`** from the `plan` CLI into `src/app/analyze.ts`
-  (shared by CLI + server). No behavior change.
-- **W2 — Fastify server**: `/api/analyze` (+ health/leagues), in-memory corpus cache,
-  engine worker pool + timeouts, input validation & rate limiting. Serve a static
-  page that POSTs and renders the JSON (port `renderPlanHtml` sections to the UI).
-- **W3 — file upload** (`.txt`/`.pob`) + paste, league selector, "download report"
-  (reuse `renderPlanHtml`), shareable saved reports (optional).
+- **W1 — extract `analyze()`** ✅ `src/app/analyze.ts` (async; shared by the `plan`
+  CLI and the server). Uses the async engine (`computeStatsFromXmlAsync`).
+- **W2 — Fastify server** ✅ `src/server/server.ts` (`npm run serve`): `POST
+  /api/analyze` (returns the rendered report HTML), `GET /api/health`, `/api/leagues`.
+  In-memory corpus cache from `data/corpus*.json`; engine async + concurrency-capped
+  (MAX_INFLIGHT); 4 MB body limit. Static frontend `public/index.html`.
+- **W3 — file upload** ✅ (`.txt`/`.pob` → textarea) + paste + league selector in the
+  page. *Remaining:* "download report" button, shareable saved reports (optional).
 - **W4 — corpus refresh job** (scheduled `cli corpus`), multi-league corpora,
   container image (Node + LuaJIT + PoB checkout + Chromium), deploy.
 - **W5 — OAuth import** once a confidential client is approved: `/auth/ggg/*`,

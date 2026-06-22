@@ -48,6 +48,19 @@ Playwright (installed above) to clear Cloudflare. `--source pobarchives` is a
 browser-free fallback. poe.ninja's build API is summary-only protobuf (no passive
 tree / PoB code), so it can't drive matching — not used as a corpus source.
 
+### Web app
+
+```bash
+npm run cli -- corpus --limit 40   # build data/corpus.json first
+npm run serve                      # → http://127.0.0.1:5173
+```
+
+Open the URL, paste a PoB2 code (or upload a `.txt`/`.pob` file), and Analyze —
+you get the same report (closest builds, path, survival) in the browser. It's a
+thin Fastify layer over the shared `analyze()` pipeline; corpora are loaded from
+`data/corpus*.json` (pre-built, never scraped per request). GGG-account import
+(OAuth) is a later phase — see [`docs/WEBAPP.md`](docs/WEBAPP.md).
+
 `plan` is the full report: it imports your build, finds the closest build in the
 corpus, lays out the path to reach it (skills/uniques to get, tree re-spec), and
 flags what you're low on right now.

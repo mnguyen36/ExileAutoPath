@@ -13,9 +13,9 @@ import { pobBuildToBuildSpec } from "./ingest/buildspec.js";
 import { buildCorpus } from "./corpus/pobarchives.js";
 import { buildCorpusFromMobalytics } from "./corpus/mobalytics.js";
 import { matchBuilds } from "./match/matcher.js";
-import { planPath, renderBuildPath } from "./plan/planner.js";
 import { renderPlanHtml } from "./report/html.js";
-import type { ResistProfile, CorpusBuild, BuildPath, SurvivalGuide } from "./types/buildspec.js";
+import { analyze } from "./app/analyze.js";
+import type { ResistProfile, CorpusBuild } from "./types/buildspec.js";
 
 function loadCorpus(path: string): CorpusBuild[] | null {
   try {
@@ -263,78 +263,58 @@ program
   .option("-f, --file <path>", "read your code (or raw XML) from a file")
   .option("-c, --corpus <path>", "corpus JSON", "data/corpus.json")
   .option("--html <path>", "also write a standalone HTML report you can open in a browser")
-  .action((code: string | undefined, opts: { file?: string; corpus: string; html?: string }) => {
+  .action(async (code: string | undefined, opts: { file?: string; corpus: string; html?: string }) => {
     const raw = opts.file ? readFileSync(opts.file, "utf8") : code;
     if (!raw) {
       console.error("Provide a PoB2 code argument or --file <path>.");
       process.exitCode = 1;
       return;
     }
-    const xml = raw.trimStart().startsWith("<") ? raw : decodePobCode(raw);
-    const build = parsePobXml(xml);
-    const user = pobBuildToBuildSpec(build, "user", "you");
-
-    console.log(
-      `You: ${build.className}${build.ascendClassName ? ` (${build.ascendClassName})` : ""} / ${user.mainSkill || "?"} — level ${build.level}\n`,
-    );
-
-    let path: BuildPath | undefined;
-    let matches: ReturnType<typeof matchBuilds> = [];
-    const corpus = loadCorpus(opts.corpus);
-    if (!corpus) {
-      console.error(`No corpus at ${opts.corpus}. Build one first:  cli corpus --out ${opts.corpus}`);
-    } else {
-      matches = matchBuilds(user, corpus, 3);
-      if (matches.length === 0) {
-        console.log("Corpus is empty — nothing to match against.");
-      } else {
-        console.log(`Closest builds (of ${corpus.length}):`);
-        matches.forEach((r, i) => {
-          const t = r.target;
-          console.log(
-            `  ${i + 1}. [${(r.score * 100).toFixed(0)}%] ${t.ascendancy || t.className || "?"} / ${t.mainSkill || "?"} (${t.level > 0 ? `L${t.level}` : "endgame"})`,
-          );
-          console.log(`        ${r.reasons.join("; ") || "weak match"}`);
-          if (t.sourceUrl) console.log(`        ${t.sourceUrl}`);
-        });
-        path = planPath(build, matches[0]!);
-        console.log(`\nPath toward #1 (${matches[0]!.target.mainSkill || matches[0]!.target.ascendancy || "closest"}):`);
-        path.steps.forEach((s, i) => console.log(`  ${i + 1}. ${s.description}`));
-      }
+    const corpus = loadCorpus(opts.corpus) ?? [];
+    if (corpus.length === 0) {
+      console.error(`(no corpus at ${opts.corpus} — matches skipped; build one:  cli corpus --out ${opts.corpus})`);
     }
 
-    // Survivability (needs the engine).
-    let guide: SurvivalGuide | undefined;
-    let stats;
-    if (engineAvailable()) {
-      const result = computeStatsFromXml(xml);
-      if (result.ok) {
-        stats = result.stats;
-        guide = analyzeSurvival(stats, {
-          level: build.level,
-          className: build.className,
-          ascendancy: build.ascendClassName,
-        });
-        console.log("\n" + renderSurvivalGuide(guide));
-      } else {
-        console.log(`\n(could not compute stats: ${result.error ?? "unknown"})`);
+    let result;
+    try {
+      result = await analyze({ code: raw }, corpus, { topN: 3 });
+    } catch (e) {
+      console.error("Error:", (e as Error).message);
+      process.exitCode = 1;
+      return;
+    }
+
+    const u = result.user;
+    console.log(`You: ${u.className}${u.ascendancy ? ` (${u.ascendancy})` : ""} / ${u.mainSkill || "?"} — level ${u.level}\n`);
+    if (result.matches.length > 0) {
+      console.log(`Closest builds (of ${corpus.length}):`);
+      result.matches.forEach((r, i) => {
+        const t = r.target;
+        console.log(
+          `  ${i + 1}. [${(r.score * 100).toFixed(0)}%] ${t.ascendancy || t.className || "?"} / ${t.mainSkill || "?"} (${t.level > 0 ? `L${t.level}` : "endgame"})`,
+        );
+        console.log(`        ${r.reasons.join("; ") || "weak match"}`);
+        if (t.sourceUrl) console.log(`        ${t.sourceUrl}`);
+      });
+      if (result.path) {
+        const top = result.matches[0]!.target;
+        console.log(`\nPath toward #1 (${top.mainSkill || top.ascendancy || "closest"}):`);
+        result.path.steps.forEach((s, i) => console.log(`  ${i + 1}. ${s.description}`));
       }
-    } else {
-      console.log("\n(install the PoB engine for the survivability section — see README)");
+    }
+    if (result.guide) {
+      console.log("\n" + renderSurvivalGuide(result.guide));
+    } else if (result.engineError) {
+      console.log(`\n(survivability unavailable: ${result.engineError})`);
     }
 
     if (opts.html) {
       const html = renderPlanHtml({
-        user: {
-          className: build.className,
-          ascendancy: build.ascendClassName,
-          mainSkill: user.mainSkill,
-          level: build.level,
-        },
-        stats,
-        matches,
-        path,
-        guide,
+        user: result.user,
+        stats: result.stats,
+        matches: result.matches,
+        path: result.path,
+        guide: result.guide,
       });
       mkdirSync(dirname(opts.html), { recursive: true });
       writeFileSync(opts.html, html);
