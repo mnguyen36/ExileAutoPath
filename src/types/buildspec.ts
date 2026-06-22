@@ -130,6 +130,7 @@ export interface BuildSpec {
   className: string;
   ascendancy: string;
   mainSkill: string;
+  allSkills?: string[]; // every active (non-support) skill the build uses
   weaponType?: string;
   keyUniques: string[];
   keystones: string[];

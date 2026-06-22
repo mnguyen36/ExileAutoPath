@@ -45,9 +45,17 @@ describe("scoreMatch", () => {
     expect(high.reasons.some((r) => /passive-tree overlap/.test(r))).toBe(true);
   });
 
-  it("recognizes related (substring) main skills", () => {
+  it("recognizes related (substring) skills", () => {
     const r = scoreMatch(spec({ mainSkill: "Spark" }), corpus({ id: "s", mainSkill: "Spark of Storms" }));
-    expect(r.reasons.join(" ")).toMatch(/related main skill/);
+    expect(r.reasons.join(" ")).toMatch(/related skill/);
+  });
+
+  it("matches when your skill appears among the target's skills (not just its main)", () => {
+    const r = scoreMatch(
+      spec({ mainSkill: "Twister" }),
+      corpus({ id: "tw", mainSkill: "Whirling Slash", allSkills: ["Whirling Slash", "Twister"] }),
+    );
+    expect(r.reasons.join(" ")).toMatch(/uses your skill \(Twister\)/);
   });
 });
 

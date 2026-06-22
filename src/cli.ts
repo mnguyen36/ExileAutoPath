@@ -279,16 +279,27 @@ program
     );
 
     let path: BuildPath | undefined;
+    let matches: ReturnType<typeof matchBuilds> = [];
     const corpus = loadCorpus(opts.corpus);
     if (!corpus) {
       console.error(`No corpus at ${opts.corpus}. Build one first:  cli corpus --out ${opts.corpus}`);
     } else {
-      const best = matchBuilds(user, corpus, 1)[0];
-      if (!best) {
+      matches = matchBuilds(user, corpus, 3);
+      if (matches.length === 0) {
         console.log("Corpus is empty — nothing to match against.");
       } else {
-        path = planPath(build, best);
-        console.log(renderBuildPath(path));
+        console.log(`Closest builds (of ${corpus.length}):`);
+        matches.forEach((r, i) => {
+          const t = r.target;
+          console.log(
+            `  ${i + 1}. [${(r.score * 100).toFixed(0)}%] ${t.ascendancy || t.className || "?"} / ${t.mainSkill || "?"} (${t.level > 0 ? `L${t.level}` : "endgame"})`,
+          );
+          console.log(`        ${r.reasons.join("; ") || "weak match"}`);
+          if (t.sourceUrl) console.log(`        ${t.sourceUrl}`);
+        });
+        path = planPath(build, matches[0]!);
+        console.log(`\nPath toward #1 (${matches[0]!.target.mainSkill || matches[0]!.target.ascendancy || "closest"}):`);
+        path.steps.forEach((s, i) => console.log(`  ${i + 1}. ${s.description}`));
       }
     }
 
@@ -321,6 +332,7 @@ program
           level: build.level,
         },
         stats,
+        matches,
         path,
         guide,
       });

@@ -40,12 +40,21 @@ function jaccard<T>(a: readonly T[], b: readonly T[]): number {
 
 const norm = (s: string) => s.trim().toLowerCase();
 
-function skillSimilarity(a: string, b: string): number {
-  if (!a || !b) return 0;
-  const x = norm(a);
-  const y = norm(b);
-  if (x === y) return 1;
-  if (x.includes(y) || y.includes(x)) return 0.5; // e.g. "Spark" vs "Spark of …"
+function skillSet(b: { mainSkill: string; allSkills?: string[] }): Set<string> {
+  return new Set([b.mainSkill, ...(b.allSkills ?? [])].map(norm).filter(Boolean));
+}
+
+// Compare the user's skills against ALL of the target's skills (not just its
+// nominal main skill), since a build's "main" gem isn't reliably first.
+function skillScore(user: BuildSpec, target: CorpusBuild): number {
+  const u = skillSet(user);
+  const t = skillSet(target);
+  if (u.size === 0 || t.size === 0) return 0;
+  if (user.mainSkill && target.mainSkill && norm(user.mainSkill) === norm(target.mainSkill)) return 1;
+  for (const s of u) if (t.has(s)) return 0.9; // a shared skill anywhere
+  for (const a of u) for (const b of t) {
+    if (a.length > 3 && b.length > 3 && (a.includes(b) || b.includes(a))) return 0.5;
+  }
   return 0;
 }
 
@@ -58,7 +67,7 @@ export function scoreMatch(
   const sameAsc = norm(user.ascendancy) === norm(target.ascendancy) && user.ascendancy !== "";
   const sameClass = norm(user.className) === norm(target.className) && user.className !== "";
   const cAsc = sameAsc ? 1 : sameClass ? 0.4 : 0;
-  const cSkill = skillSimilarity(user.mainSkill, target.mainSkill);
+  const cSkill = skillScore(user, target);
   const cTree = jaccard(user.treeNodes, target.treeNodes);
   const cUniq = jaccard(user.keyUniques.map(norm), target.keyUniques.map(norm));
   const cWeapon =
@@ -75,7 +84,8 @@ export function scoreMatch(
   if (sameAsc) reasons.push(`same ascendancy (${target.ascendancy})`);
   else if (sameClass) reasons.push(`same class (${target.className}), different ascendancy`);
   if (cSkill === 1) reasons.push(`same main skill (${target.mainSkill})`);
-  else if (cSkill > 0) reasons.push(`related main skill (${target.mainSkill})`);
+  else if (cSkill >= 0.9 && user.mainSkill) reasons.push(`uses your skill (${user.mainSkill})`);
+  else if (cSkill > 0) reasons.push(`related skill`);
   if (cTree > 0) reasons.push(`${Math.round(cTree * 100)}% passive-tree overlap`);
   const sharedUniques = user.keyUniques.filter((u) =>
     target.keyUniques.some((t) => norm(t) === norm(u)),

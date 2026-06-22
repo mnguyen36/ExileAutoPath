@@ -62,6 +62,14 @@ function classFromIcon(iconURL: string): string {
   return CLASSES.find((c) => file.startsWith(c)) ?? "";
 }
 
+// Many slugs name the class even when they don't name the ascendancy
+// (e.g. "twister-huntress-levelling" -> Huntress). Checked AFTER ascendancy so
+// "witchhunter" resolves to Mercenary, not Witch.
+function classFromSlug(slug: string): string {
+  const s = slug.toLowerCase();
+  return CLASSES.find((c) => s.includes(c.toLowerCase())) ?? "";
+}
+
 // Minimal Playwright surface we use (avoids a hard type dependency).
 interface Pageish {
   goto(url: string, opts: { waitUntil: string; timeout: number }): Promise<unknown>;
@@ -156,6 +164,7 @@ interface RawBuild {
   pobCode: string | null;
   treeNodes: number[];
   mainSkill: string;
+  allSkills: string[];
   mainGemIcon: string;
   uniques: string[];
 }
@@ -196,7 +205,11 @@ export async function fetchBuild(page: Pageish, slug: string): Promise<RawBuild 
       .map((s) => parseInt(String(s).replace(/^node-/, ""), 10))
       .filter((n) => Number.isFinite(n));
 
-    const g0 = ((v.skillGems as any)?.gems?.[0]?.activeSkill ?? {}) as Record<string, unknown>;
+    const gems = (((v.skillGems as any)?.gems ?? []) as any[]) || [];
+    const g0 = (gems[0]?.activeSkill ?? {}) as Record<string, unknown>;
+    const allSkills = gems
+      .map((g) => String(g?.activeSkill?.name ?? ""))
+      .filter((n) => n.length > 0);
     const eq = (v.equipment as Record<string, any>) ?? {};
     const uniques: string[] = [];
     for (const k of Object.keys(eq)) {
@@ -211,6 +224,7 @@ export async function fetchBuild(page: Pageish, slug: string): Promise<RawBuild 
       pobCode: typeof doc.pobCode === "string" ? doc.pobCode : null,
       treeNodes,
       mainSkill: String(g0.name ?? ""),
+      allSkills: [...new Set(allSkills)],
       mainGemIcon: String(g0.iconURL ?? ""),
       uniques: [...new Set(uniques)],
     };
@@ -218,14 +232,22 @@ export async function fetchBuild(page: Pageish, slug: string): Promise<RawBuild 
 }
 
 function rawToBuildSpec(raw: RawBuild, slug: string, league?: string): BuildSpec {
-  // Prefer the ready-made pobCode (authoritative class/ascendancy/tree/skill).
+  // Prefer the ready-made pobCode (authoritative class/ascendancy/tree/skill),
+  // but never drop a build if its code is missing or fails to decode — fall back
+  // to the variant data we already extracted.
   if (raw.pobCode) {
-    const build = parsePobCode(raw.pobCode);
-    if (build.isPoE2) return codeToBuildSpec(raw.pobCode, "mobalytics", slug, league);
+    try {
+      if (parsePobCode(raw.pobCode).isPoE2) {
+        return codeToBuildSpec(raw.pobCode, "mobalytics", slug, league);
+      }
+    } catch {
+      // bad/corrupt pobCode — derive from the variant instead
+    }
   }
-  // Otherwise derive from the variant + slug.
   const ascendancy = ascendancyFromSlug(slug);
-  const className = ascendancy ? (ASCENDANCY_CLASS[ascendancy] ?? "") : classFromIcon(raw.mainGemIcon);
+  const className =
+    (ascendancy ? ASCENDANCY_CLASS[ascendancy] : undefined) ??
+    (classFromSlug(slug) || classFromIcon(raw.mainGemIcon));
   return {
     source: "mobalytics",
     id: slug,
@@ -233,12 +255,13 @@ function rawToBuildSpec(raw: RawBuild, slug: string, league?: string): BuildSpec
     className,
     ascendancy,
     mainSkill: raw.mainSkill,
+    allSkills: raw.allSkills,
     keyUniques: raw.uniques,
     keystones: [],
     notables: [],
     treeNodes: raw.treeNodes,
     level: 0, // unknown without a pobCode; endgame variant
-    pobCode: raw.pobCode ?? undefined,
+    pobCode: undefined, // only carry a code that actually decoded (handled above)
   };
 }
 

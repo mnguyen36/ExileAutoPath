@@ -14,6 +14,16 @@ function mainSkillOf(build: PobBuild): string {
   return group?.gems.find((g) => !g.isSupport && g.enabled)?.nameSpec ?? group?.gems[0]?.nameSpec ?? "";
 }
 
+function allSkillsOf(build: PobBuild): string[] {
+  const out = new Set<string>();
+  for (const group of build.skills) {
+    for (const gem of group.gems) {
+      if (!gem.isSupport && gem.nameSpec) out.add(gem.nameSpec);
+    }
+  }
+  return [...out];
+}
+
 function keyUniquesOf(build: PobBuild): string[] {
   const seen = new Set<string>();
   for (const it of build.items) {
@@ -48,6 +58,7 @@ export function pobBuildToBuildSpec(
     className: build.className,
     ascendancy: build.ascendClassName,
     mainSkill: mainSkillOf(build),
+    allSkills: allSkillsOf(build),
     weaponType: weaponTypeOf(build),
     keyUniques: keyUniquesOf(build),
     keystones: [],
