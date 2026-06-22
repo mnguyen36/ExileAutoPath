@@ -7,6 +7,7 @@ import {
   computeStatsFromCode,
   engineAvailable,
 } from "./engine/pob.js";
+import { analyzeSurvival, renderSurvivalGuide } from "./report/survival.js";
 import type { ResistProfile } from "./types/buildspec.js";
 
 const program = new Command();
@@ -118,6 +119,46 @@ program
     console.log(`Resists:  ${resistLine || "—"}`);
     console.log(`Max hit:  ${hitLine || "—"}    TotalEHP ${f(s.totalEHP)}`);
     console.log(`Stun threshold: ${f(s.stunThreshold)}`);
+  });
+
+program
+  .command("guide")
+  .description("Survival guide: compute stats and flag what you're low on / what to upgrade next")
+  .argument("[code]", "PoB2 import code (or use --file)")
+  .option("-f, --file <path>", "read the code (or raw XML) from a file")
+  .option("--json", "print the SurvivalGuide as JSON")
+  .action((code: string | undefined, opts: { file?: string; json?: boolean }) => {
+    if (!engineAvailable()) {
+      console.error(
+        "PoB engine unavailable. Needs LuaJIT (set POB_LUAJIT) and .vendor/PathOfBuilding-PoE2.",
+      );
+      process.exitCode = 1;
+      return;
+    }
+    const raw = opts.file ? readFileSync(opts.file, "utf8") : code;
+    if (!raw) {
+      console.error("Provide a PoB2 code argument or --file <path>.");
+      process.exitCode = 1;
+      return;
+    }
+    const xml = raw.trimStart().startsWith("<") ? raw : decodePobCode(raw);
+    const build = parsePobXml(xml);
+    const result = computeStatsFromXml(xml);
+    if (!result.ok) {
+      console.error("Engine error:", result.error ?? "unknown");
+      process.exitCode = 1;
+      return;
+    }
+    const guide = analyzeSurvival(result.stats, {
+      level: build.level,
+      className: build.className,
+      ascendancy: build.ascendClassName,
+    });
+    if (opts.json) {
+      console.log(JSON.stringify(guide, null, 2));
+      return;
+    }
+    console.log(renderSurvivalGuide(guide));
   });
 
 program.parseAsync(process.argv);

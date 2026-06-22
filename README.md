@@ -32,7 +32,11 @@ npm test            # vitest (engine integration test auto-skips if no engine)
 npm run typecheck   # tsc --noEmit
 npm run cli -- inspect --file fixtures/example.pob   # decode + summarise a PoB2 code
 npm run cli -- stats   --file fixtures/example.pob   # compute live stats via headless PoB2
+npm run cli -- guide   --file fixtures/example.pob   # survival guide: what you're low on + next upgrades
 ```
+
+The `inspect`/`stats`/`guide` commands also accept a code as a positional arg
+(`npm run cli -- guide <pob2-code>`) or raw XML.
 
 ### Engine setup (for `stats` / live computation)
 

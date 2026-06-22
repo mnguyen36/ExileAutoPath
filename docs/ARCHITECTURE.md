@@ -133,7 +133,7 @@ Defined in `src/types/buildspec.ts`.
 | `corpus/gamedata` | tree/item/gem dictionaries | repoe-fork + GGG tree export, cached locally | low |
 | `match/matcher` | nearest meta build | weighted feature similarity + tree Jaccard | med |
 | `plan/planner` | current vs target diff → steps | set diffs + level-band ordering + cost lookup | med |
-| `report/survival` | render guide | gap analysis over StatProfile + step list | low |
+| `report/survival` | render guide | gap analysis over StatProfile + step list | ✅ working |
 
 **Engine decision (resolved 2026-06-22, Phase 1 spike):** `pob-web`'s WASM is
 **not** headless-Node-viable without a major fork (browser-bound driver; never
@@ -176,8 +176,11 @@ MaximumHitTaken, resist overcap. Tradeoff accepted: a native LuaJIT dependency
   requests, decode protobuf → `CorpusBuild[]` per league, cached.
 - **Phase 5 — Matcher.** `BuildSpec` → ranked `MatchResult[]`.
 - **Phase 6 — Planner.** Diff current vs matched target → ordered `UpgradeStep[]`.
-- **Phase 7 — Survival guide.** Gap analysis + render. End-to-end CLI:
-  `exileautopath plan --file my.pob`.
+- **Phase 7 — Survival guide.** ✅ *Standalone gap analysis done* (`report/survival.ts`,
+  `guide` CLI): flags uncapped/negative resistances, low eHP-for-level, near-full
+  Spirit reservation, missing mitigation layer, weakest damage type; emits gap-driven
+  upgrade steps. Validated on real pobb.in builds. *Remaining:* fold in matched-build
+  targets (from Phases 4-6) to replace heuristic thresholds with real comparisons.
 - **Phase 8 — OAuth import.** Once approved, PKCE login → character → build.
 - **Phase 9 — UI.** Web front-end if/when desired (stack already WASM-friendly).
 
@@ -205,6 +208,12 @@ MaximumHitTaken, resist overcap. Tradeoff accepted: a native LuaJIT dependency
 - **Scraper fragility**: mobalytics `__PRELOADED_STATE__` and poe.ninja API are
   undocumented; pin parsers behind adapters and snapshot fixtures.
 - **OAuth approval**: external, manual, possibly slow or denied. Do not block on it.
+- **DPS needs skill-selection/config**: on real builds the engine returns correct
+  *defences* but often `TotalDPS≈0`, because the auto-selected main socket group
+  isn't the damage skill and/or the build needs enemy/config options. Defences (the
+  survival guide's domain) are validated; **DPS extraction needs main-skill
+  auto-selection (pick best group / honor mainSocketGroup) + sane enemy config** —
+  tackle in the matcher phase. Validated builds: real L93/L96 Stormweaver (pobb.in).
 - **Cost data**: currency values for "what to buy" need a price source (poe.ninja
   economy API or trade); estimates only, and volatile.
 - **Data freshness**: pin game-data dump versions; PoE2 is pre-1.0 and churns each patch.
