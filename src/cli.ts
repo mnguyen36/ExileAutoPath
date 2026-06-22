@@ -13,7 +13,8 @@ import { pobBuildToBuildSpec } from "./ingest/buildspec.js";
 import { buildCorpus } from "./corpus/pobarchives.js";
 import { matchBuilds } from "./match/matcher.js";
 import { planPath, renderBuildPath } from "./plan/planner.js";
-import type { ResistProfile, CorpusBuild } from "./types/buildspec.js";
+import { renderPlanHtml } from "./report/html.js";
+import type { ResistProfile, CorpusBuild, BuildPath, SurvivalGuide } from "./types/buildspec.js";
 
 function loadCorpus(path: string): CorpusBuild[] | null {
   try {
@@ -244,7 +245,8 @@ program
   .argument("[code]", "PoB2 import code (or use --file)")
   .option("-f, --file <path>", "read your code (or raw XML) from a file")
   .option("-c, --corpus <path>", "corpus JSON", "data/corpus.json")
-  .action((code: string | undefined, opts: { file?: string; corpus: string }) => {
+  .option("--html <path>", "also write a standalone HTML report you can open in a browser")
+  .action((code: string | undefined, opts: { file?: string; corpus: string; html?: string }) => {
     const raw = opts.file ? readFileSync(opts.file, "utf8") : code;
     if (!raw) {
       console.error("Provide a PoB2 code argument or --file <path>.");
@@ -259,24 +261,28 @@ program
       `You: ${build.className}${build.ascendClassName ? ` (${build.ascendClassName})` : ""} / ${user.mainSkill || "?"} — level ${build.level}\n`,
     );
 
+    let path: BuildPath | undefined;
     const corpus = loadCorpus(opts.corpus);
     if (!corpus) {
       console.error(`No corpus at ${opts.corpus}. Build one first:  cli corpus --out ${opts.corpus}`);
-      process.exitCode = 1;
-      return;
-    }
-    const best = matchBuilds(user, corpus, 1)[0];
-    if (!best) {
-      console.log("Corpus is empty — nothing to match against.");
     } else {
-      console.log(renderBuildPath(planPath(build, best)));
+      const best = matchBuilds(user, corpus, 1)[0];
+      if (!best) {
+        console.log("Corpus is empty — nothing to match against.");
+      } else {
+        path = planPath(build, best);
+        console.log(renderBuildPath(path));
+      }
     }
 
     // Survivability (needs the engine).
+    let guide: SurvivalGuide | undefined;
+    let stats;
     if (engineAvailable()) {
       const result = computeStatsFromXml(xml);
       if (result.ok) {
-        const guide = analyzeSurvival(result.stats, {
+        stats = result.stats;
+        guide = analyzeSurvival(stats, {
           level: build.level,
           className: build.className,
           ascendancy: build.ascendClassName,
@@ -287,6 +293,23 @@ program
       }
     } else {
       console.log("\n(install the PoB engine for the survivability section — see README)");
+    }
+
+    if (opts.html) {
+      const html = renderPlanHtml({
+        user: {
+          className: build.className,
+          ascendancy: build.ascendClassName,
+          mainSkill: user.mainSkill,
+          level: build.level,
+        },
+        stats,
+        path,
+        guide,
+      });
+      mkdirSync(dirname(opts.html), { recursive: true });
+      writeFileSync(opts.html, html);
+      console.log(`\nHTML report written to ${opts.html} — open it in a browser.`);
     }
   });
 

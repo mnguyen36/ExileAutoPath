@@ -11,5 +11,7 @@ pob-src
 fixtures/*.local.*
 fixtures/_*
 data/
+report.html
+*.report.html
 coverage/
 *.tsbuildinfo
