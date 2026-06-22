@@ -128,9 +128,9 @@ Defined in `src/types/buildspec.ts`.
 | `ingest/charjson` | GGG character JSON → PoB2 build | port PoB-PoE2 import mapping | med |
 | `ingest/oauth` | PKCE login → fetch character | port PoB-PoE2 flow; **needs GGG approval** | high (external) |
 | `engine/pob` | stats for any build | LuaJIT subprocess → vendored PoB-PoE2 `HeadlessWrapper.lua` | ✅ working |
-| `corpus/pobarchives` | meta builds (PoB codes) | scrape pobarchives→pobb.in, decode, filter PoE2 | ✅ working |
-| `corpus/poeninja` | ladder builds | protobuf + dictionary | ⛔ Cloudflare-gated (needs headless browser) |
-| `corpus/mobalytics` | guide variants | `__PRELOADED_STATE__` JSON | ⛔ Cloudflare JS challenge (needs headless browser) |
+| `corpus/mobalytics` | meta builds + variants | Playwright → `__PRELOADED_STATE__`; pobCode or variant-derived | ✅ working (default) |
+| `corpus/pobarchives` | meta builds (PoB codes) | scrape pobarchives→pobb.in, decode, filter PoE2 | ✅ working (no browser) |
+| `corpus/poeninja` | ladder builds | protobuf + dictionaries | ⛔ summary-only (no tree/PoB code) — see notes |
 | `corpus/gamedata` | tree/item/gem dictionaries | repoe-fork + GGG tree export, cached locally | low |
 | `match/matcher` | nearest meta build | weighted feature similarity + tree Jaccard | ✅ working |
 | `plan/planner` | current vs target diff → steps | tree node-set diff + skill/item diff | ✅ working |
@@ -171,14 +171,17 @@ MaximumHitTaken, resist overcap. Tradeoff accepted: a native LuaJIT dependency
   values) — fold in when corpus/import produces real codes.
 - **Phase 2 — Game data.** Vendor/cache repoe-fork + GGG tree export. Resolve node
   ids → names/stats, gem/item names ↔ ids. Refine support-gem detection.
-- **Phase 3 — Corpus** ✅ *via pobarchives* (`corpus/pobarchives.ts`, `corpus` CLI).
-  mobalytics & poe.ninja are **Cloudflare-gated** (JS challenge / bot block — curl
-  & Node fetch get "Just a moment…"), so pivoted to **pobarchives.com** (curl-friendly,
-  links pobb.in PoB codes). Discover ids → resolve pobb.in code → decode → filter PoE2
-  → `CorpusBuild`. *Later:* add mobalytics/poe.ninja via a headless browser
-  (Playwright) for variants + popularity; fold in mobalytics priority-lists for the path.
-- **Phase 4 — Corpus: poe.ninja / mobalytics (headless).** Deferred — needs a
-  browser to clear Cloudflare. Gives ladder popularity + guide upgrade-path variants.
+- **Phase 3 — Corpus** ✅ *mobalytics (default) + pobarchives*. mobalytics
+  (`corpus/mobalytics.ts`) drives **Playwright** (headless Chromium clears
+  Cloudflare's JS challenge), reads each build's `window.__PRELOADED_STATE__`, and
+  uses its `pobCode` when present or derives the spec from the endgame variant
+  (tree node ids + main skill + uniques; class from gem icon, ascendancy from slug).
+  Fresh browser context per build (state only injects on first navigation). pobarchives
+  (`corpus/pobarchives.ts`) remains a no-browser fallback. `corpus --source ...` CLI.
+- **Phase 4 — Corpus: poe.ninja (deferred).** Reachable (version `NNNN-…`,
+  `overview=runes-of-aldur`), but the `search` response is **columnar, dictionary-
+  encoded protobuf with summary columns only — no passive tree, no PoB code** — so it
+  can't drive tree-matching or the path planner. Could layer in *popularity* later.
 - **Phase 5 — Matcher** ✅ `match/matcher.ts` + `match` CLI: weighted blend of
   ascendancy / main-skill / tree-Jaccard / uniques / weapon → ranked `MatchResult[]`
   with reasons. Validated: real Stormweaver → closest corpus Stormweaver.
@@ -210,6 +213,11 @@ MaximumHitTaken, resist overcap. Tradeoff accepted: a native LuaJIT dependency
 - **2026-06-22** Corpus source = pobarchives.com (curl-friendly → pobb.in codes), not
   mobalytics/poe.ninja (Cloudflare JS challenge). All build data comes from decoding
   the PoB code; pobarchives is discovery only. Filter to PoE2 by decoded root element.
+- **2026-06-22** Default corpus source switched to **mobalytics via Playwright** (user
+  request: more current than pobarchives). poe.ninja rejected for the corpus: its build
+  API is summary-only protobuf (no tree/PoB code). Gotchas baked in: real Chromium
+  clears Cloudflare; shim `globalThis.__name` (esbuild names → browser) before
+  `evaluate`; one fresh context per build (`__PRELOADED_STATE__` only on first nav).
 
 ---
 

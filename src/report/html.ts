@@ -77,7 +77,7 @@ function pathSection(p: BuildPath): string {
     <div class="target">
       <div class="match">${Math.round(p.matchScore * 100)}%</div>
       <div>
-        <div class="tname">${esc(t.ascendancy || t.className)} / ${esc(t.mainSkill || "?")} <span class="muted">L${esc(t.level)}</span></div>
+        <div class="tname">${esc(t.ascendancy || t.className)} / ${esc(t.mainSkill || "?")} <span class="muted">${t.level > 0 ? `L${esc(t.level)}` : "endgame"}</span></div>
         <div class="why">${esc(p.matchReasons.join("; "))}</div>
         <div class="link">${link}</div>
       </div>

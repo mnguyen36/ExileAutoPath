@@ -13,5 +13,9 @@ fixtures/_*
 data/
 report.html
 *.report.html
+# personal build-code paste files
+code.txt
+me.txt
+*.pob.txt
 coverage/
 *.tsbuildinfo

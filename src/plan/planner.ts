@@ -123,7 +123,7 @@ export function renderBuildPath(path: BuildPath): string {
   const t = path.target;
   const lines: string[] = [];
   lines.push(
-    `Closest build: ${t.ascendancy || t.className} / ${t.mainSkill || "?"} (L${t.level}) — ${(path.matchScore * 100).toFixed(0)}% match`,
+    `Closest build: ${t.ascendancy || t.className} / ${t.mainSkill || "?"} (${t.level > 0 ? `L${t.level}` : "endgame"}) — ${(path.matchScore * 100).toFixed(0)}% match`,
   );
   if (t.sourceUrl) lines.push(`  ${t.sourceUrl}`);
   if (path.matchReasons.length) lines.push(`  Why: ${path.matchReasons.join("; ")}`);

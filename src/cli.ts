@@ -11,6 +11,7 @@ import {
 import { analyzeSurvival, renderSurvivalGuide } from "./report/survival.js";
 import { pobBuildToBuildSpec } from "./ingest/buildspec.js";
 import { buildCorpus } from "./corpus/pobarchives.js";
+import { buildCorpusFromMobalytics } from "./corpus/mobalytics.js";
 import { matchBuilds } from "./match/matcher.js";
 import { planPath, renderBuildPath } from "./plan/planner.js";
 import { renderPlanHtml } from "./report/html.js";
@@ -177,21 +178,37 @@ program
 
 program
   .command("corpus")
-  .description("Build a local meta-build corpus by scraping pobarchives -> pobb.in PoB2 codes")
+  .description("Build a local meta-build corpus from mobalytics (default) or pobarchives")
+  .option("--source <s>", "mobalytics or pobarchives", "mobalytics")
   .option("--league <name>", "tag builds with this league")
-  .option("--game <g>", "poe2 or poe1", "poe2")
+  .option("--game <g>", "poe2 or poe1 (pobarchives only)", "poe2")
   .option("--limit <n>", "target number of builds to collect", "20")
-  .option("--scan <n>", "max candidates to examine (default limit*4)")
+  .option("--scan <n>", "max candidates to examine (pobarchives only)")
   .option("-o, --out <path>", "output corpus JSON", "data/corpus.json")
   .action(
-    async (opts: { league?: string; game: string; limit: string; scan?: string; out: string }) => {
-      const corpus = await buildCorpus({
-        game: opts.game,
-        league: opts.league,
-        limit: Number(opts.limit),
-        scan: opts.scan ? Number(opts.scan) : undefined,
-        onProgress: (m) => console.error(m), // progress on stderr; result path on stdout
-      });
+    async (opts: {
+      source: string;
+      league?: string;
+      game: string;
+      limit: string;
+      scan?: string;
+      out: string;
+    }) => {
+      const onProgress = (m: string) => console.error(m); // progress on stderr; result path on stdout
+      const corpus =
+        opts.source === "pobarchives"
+          ? await buildCorpus({
+              game: opts.game,
+              league: opts.league,
+              limit: Number(opts.limit),
+              scan: opts.scan ? Number(opts.scan) : undefined,
+              onProgress,
+            })
+          : await buildCorpusFromMobalytics({
+              league: opts.league,
+              limit: Number(opts.limit),
+              onProgress,
+            });
     mkdirSync(dirname(opts.out), { recursive: true });
     writeFileSync(opts.out, JSON.stringify(corpus, null, 2));
     console.log(`Saved ${corpus.length} builds to ${opts.out}`);
@@ -233,7 +250,7 @@ program
     results.forEach((r, i) => {
       const t = r.target;
       console.log(
-        `  ${i + 1}. [${(r.score * 100).toFixed(0)}%] ${t.ascendancy || t.className} / ${t.mainSkill || "?"} (L${t.level})  ${t.sourceUrl ?? ""}`,
+        `  ${i + 1}. [${(r.score * 100).toFixed(0)}%] ${t.ascendancy || t.className} / ${t.mainSkill || "?"} (${t.level > 0 ? `L${t.level}` : "endgame"})  ${t.sourceUrl ?? ""}`,
       );
       console.log(`        ${r.reasons.join("; ") || "weak match"}`);
     });

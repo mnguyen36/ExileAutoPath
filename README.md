@@ -37,10 +37,16 @@ npm run cli -- stats   --file fixtures/example.pob   # compute live stats via he
 npm run cli -- guide   --file fixtures/example.pob   # survival guide: what you're low on + next upgrades
 
 # Build a meta-build corpus, then match / plan against it:
-npm run cli -- corpus  --limit 10 --league runesofaldur   # scrape pobarchives -> data/corpus.json
+npm run cli -- corpus  --limit 40 --league runesofaldur   # mobalytics (Playwright) -> data/corpus.json
+npm run cli -- corpus  --source pobarchives --limit 20     # no-browser fallback source
 npm run cli -- match   --file my.pob                       # rank closest corpus builds
-npm run cli -- plan    --file my.pob                       # closest build + path to it + survival guide
+npm run cli -- plan    --file my.pob --html report.html    # closest build + path + survival (+ HTML)
 ```
+
+The default corpus source is **mobalytics** (current build guides), which needs
+Playwright (installed above) to clear Cloudflare. `--source pobarchives` is a
+browser-free fallback. poe.ninja's build API is summary-only protobuf (no passive
+tree / PoB code), so it can't drive matching — not used as a corpus source.
 
 `plan` is the full report: it imports your build, finds the closest build in the
 corpus, lays out the path to reach it (skills/uniques to get, tree re-spec), and
