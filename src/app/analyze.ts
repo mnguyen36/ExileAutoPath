@@ -24,6 +24,7 @@ export interface AnalyzeInput {
 export interface AnalyzeOptions {
   topN?: number;
   computeStats?: boolean; // default true when the engine is available
+  target?: CorpusBuild; // plan the path toward this build instead of the #1 match
 }
 
 export interface AnalyzeResult {
@@ -32,8 +33,9 @@ export interface AnalyzeResult {
   engineError?: string;
   matches: MatchResult[];
   path?: BuildPath;
+  customTarget: boolean; // true if the path is toward a user-chosen build, not the #1 match
   guide?: SurvivalGuide;
-  // Allocated passive-node ids for the tree view: yours, and the #1 match's.
+  // Allocated passive-node ids for the tree view: yours, and the path target's.
   userNodes: number[];
   targetNodes: number[];
 }
@@ -54,7 +56,11 @@ export async function analyze(
   const user = pobBuildToBuildSpec(build, "user", "you");
 
   const matches = matchBuilds(user, [...corpus], opts.topN ?? 3);
-  const path = matches[0] ? planPath(build, matches[0]) : undefined;
+  // Path toward the user's chosen build if given, otherwise the #1 match.
+  const pathMatch: MatchResult | undefined = opts.target
+    ? { target: opts.target, score: 1, reasons: ["the build you chose"] }
+    : matches[0];
+  const path = pathMatch ? planPath(build, pathMatch) : undefined;
 
   let stats: StatProfile | undefined;
   let guide: SurvivalGuide | undefined;
@@ -91,8 +97,9 @@ export async function analyze(
     engineError,
     matches,
     path,
+    customTarget: !!opts.target,
     guide,
     userNodes: user.treeNodes,
-    targetNodes: matches[0]?.target.treeNodes ?? [],
+    targetNodes: (opts.target ?? matches[0]?.target)?.treeNodes ?? [],
   };
 }

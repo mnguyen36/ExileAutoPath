@@ -265,6 +265,18 @@ function rawToBuildSpec(raw: RawBuild, slug: string, league?: string): BuildSpec
   };
 }
 
+/** Resolve a single mobalytics build URL to a CorpusBuild (for the target override). */
+export async function resolveMobalyticsBuild(url: string, league?: string): Promise<CorpusBuild | null> {
+  const slug = url.match(/\/poe-2\/builds\/([a-z0-9][a-z0-9-]+)/i)?.[1];
+  if (!slug) return null;
+  return withBrowser(async (browser) => {
+    const raw = await inFreshContext(browser, (page) => fetchBuild(page, slug));
+    if (!raw || raw.treeNodes.length === 0) return null;
+    const spec = rawToBuildSpec(raw, slug, league);
+    return { ...spec, sourceUrl: `https://mobalytics.gg/poe-2/builds/${slug}` } as CorpusBuild;
+  });
+}
+
 export interface MobalyticsCorpusOptions {
   league?: string;
   limit?: number;

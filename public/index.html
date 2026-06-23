@@ -20,6 +20,7 @@
       button.primary { background: #caa85a; color: #1b1207; border-color: #caa85a; font-weight: 600; }
       button:disabled { opacity: 0.5; cursor: default; }
       label.file input { display: none; }
+      input.targetin { flex: 1; min-width: 0; background: #23262f; color: #e7e3d6; border: 1px solid #30343f; border-radius: 8px; padding: 8px 10px; font: 12px/1.4 ui-monospace, Consolas, monospace; }
       .hint { color: #8a857a; font-size: 12px; }
       .status { margin-top: 10px; font-size: 13px; min-height: 18px; }
       .status.err { color: #ff9b9b; }
@@ -100,6 +101,10 @@
           <span class="hint" id="engineHint"></span>
         </div>
         <div class="status" id="status"></div>
+        <div class="row" style="margin-top: 6px">
+          <input id="target" class="targetin" placeholder="Optional — plan toward a specific build instead: paste a pobb.in or mobalytics link, or a PoB2 code" />
+          <button id="useTarget">Use this build</button>
+        </div>
       </div>
       <iframe id="report" title="report" sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe>
 
@@ -381,30 +386,34 @@
       async function analyze() {
         const code = $("code").value.trim();
         if (!code) { status("Paste a code or upload a file first.", "warn"); return; }
-        $("go").disabled = true;
-        status("Analyzing… (computing stats can take a couple of seconds)");
+        const target = $("target").value.trim();
+        $("go").disabled = true; $("useTarget").disabled = true;
+        status(target
+          ? "Resolving your target build & analyzing… (fetching the link can take a few seconds)"
+          : "Analyzing… (computing stats can take a couple of seconds)");
         try {
+          const body = { code, league: $("league").value || undefined };
+          if (target) body.target = target;
           const res = await fetch("/api/analyze", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ code, league: $("league").value || undefined }),
+            body: JSON.stringify(body),
           });
           const data = await res.json();
           if (!data.ok) { status(data.error || "Analyze failed.", "err"); return; }
           $("report").srcdoc = data.html;
           showTree(data.tree).catch((e) => console.error("tree render failed", e));
           const who = `${data.user.ascendancy || data.user.className} / ${data.user.mainSkill || "?"} (L${data.user.level})`;
-          status(
-            `${who} — matched against ${data.corpusSize} builds${data.engineError ? " · stats unavailable: " + data.engineError : ""}.`,
-            data.engineError ? "warn" : "",
-          );
+          const note = data.customTarget ? " · path toward your chosen build" : ` — matched against ${data.corpusSize} builds`;
+          status(`${who}${note}${data.engineError ? " · stats unavailable: " + data.engineError : ""}.`, data.engineError ? "warn" : "");
         } catch (err) {
           status("Request failed: " + err, "err");
         } finally {
-          $("go").disabled = false;
+          $("go").disabled = false; $("useTarget").disabled = false;
         }
       }
       $("go").addEventListener("click", analyze);
+      $("useTarget").addEventListener("click", analyze);
       $("code").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) analyze(); });
     </script>
   </body>

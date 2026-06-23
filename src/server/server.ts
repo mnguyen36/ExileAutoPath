@@ -13,7 +13,47 @@ import { fileURLToPath } from "node:url";
 import { analyze } from "../app/analyze.js";
 import { renderPlanHtml } from "../report/html.js";
 import { engineAvailable } from "../engine/pob.js";
+import { decodePobCode, parsePobXml } from "../ingest/pobcode.js";
+import { pobBuildToBuildSpec } from "../ingest/buildspec.js";
+import { resolveMobalyticsBuild } from "../corpus/mobalytics.js";
 import type { CorpusBuild } from "../types/buildspec.js";
+
+const TARGET_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+// Build a target CorpusBuild from a pasted PoB2 code/XML.
+function codeTarget(input: string, url?: string): CorpusBuild {
+  const isXml = input.trimStart().startsWith("<");
+  const build = parsePobXml(isXml ? input : decodePobCode(input));
+  if (!build.isPoE2) throw new Error("that isn't a Path of Building 2 (PoE2) build");
+  const spec = pobBuildToBuildSpec(build, "user", "custom", { pobCode: isXml ? undefined : input.trim() });
+  return { ...spec, sourceUrl: url } as CorpusBuild;
+}
+
+// Resolve a user-supplied target: a PoB2 code, a pobb.in link, or a mobalytics link.
+async function resolveTarget(input: string): Promise<CorpusBuild> {
+  const s = input.trim();
+  if (/^https?:\/\//i.test(s)) {
+    const pobb = s.match(/pobb\.in\/([A-Za-z0-9_-]+)/i);
+    if (pobb) {
+      const res = await fetch(`https://pobb.in/${pobb[1]}/raw`, {
+        headers: { "User-Agent": TARGET_UA },
+        signal: AbortSignal.timeout(20000),
+      });
+      if (!res.ok) throw new Error(`pobb.in returned ${res.status}`);
+      const code = (await res.text()).trim();
+      if (!code || code.includes("<")) throw new Error("couldn't read a PoB code from that pobb.in link");
+      return codeTarget(code, s);
+    }
+    if (/mobalytics\.gg\/poe-2\/builds\//i.test(s)) {
+      const cb = await resolveMobalyticsBuild(s);
+      if (!cb) throw new Error("couldn't read that mobalytics build");
+      return cb;
+    }
+    throw new Error("unsupported link — use a pobb.in or mobalytics build link, or paste a PoB2 code");
+  }
+  return codeTarget(s);
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..", "..");
@@ -59,6 +99,7 @@ interface AnalyzeBody {
   code?: string;
   xml?: string;
   league?: string;
+  target?: string; // optional: a build link / PoB code to plan toward instead of the #1 match
 }
 
 app.post("/api/analyze", async (req, reply) => {
@@ -74,14 +115,25 @@ app.post("/api/analyze", async (req, reply) => {
     reply.code(503);
     return { ok: false, error: "Server busy computing other builds — try again in a moment." };
   }
+  let target: CorpusBuild | undefined;
+  if (body.target && body.target.trim()) {
+    try {
+      target = await resolveTarget(body.target);
+    } catch (e) {
+      reply.code(400);
+      return { ok: false, error: `Target build: ${(e as Error).message}.` };
+    }
+  }
+
   inflight++;
   try {
-    const result = await analyze({ code: body.code, xml: body.xml }, corpus, { topN: 3 });
+    const result = await analyze({ code: body.code, xml: body.xml }, corpus, { topN: 3, target });
     const html = renderPlanHtml({
       user: result.user,
       stats: result.stats,
       matches: result.matches,
       path: result.path,
+      customTarget: result.customTarget,
       guide: result.guide,
     });
     return {
@@ -90,6 +142,7 @@ app.post("/api/analyze", async (req, reply) => {
       corpusSize: corpus.length,
       user: result.user,
       engineError: result.engineError,
+      customTarget: result.customTarget,
       html,
       tree: { userNodes: result.userNodes, targetNodes: result.targetNodes },
     };
