@@ -56,6 +56,11 @@ for id, node in pairs(tree.nodes) do
       parts[#parts + 1] = ',"g":' .. jnum(node.group) .. ',"o":' .. jnum(node.orbit)
       if node.isKeystone then parts[#parts + 1] = ',"k":1' end
       if node.isNotable then parts[#parts + 1] = ',"t":1' end
+      -- For PoB's connection rules: ascendancy membership + class-start hubs.
+      if type(node.ascendancyName) == "string" and node.ascendancyName ~= "" then
+        parts[#parts + 1] = ',"a":' .. jstr(node.ascendancyName)
+      end
+      if node.classesStart ~= nil then parts[#parts + 1] = ',"cs":1' end
       if node.name and node.name ~= "" then parts[#parts + 1] = ',"n":' .. jstr(node.name) end
       if type(node.icon) == "string" and node.icon ~= "" then
         local ic = node.icon:gsub("%.dds$", ".webp"):gsub("^Art/2DArt/SkillIcons/", "")

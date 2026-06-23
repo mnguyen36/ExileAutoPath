@@ -215,6 +215,10 @@
           for (const cid of n.c) {
             const m = t.byId.get(cid);
             if (!m) continue;
+            // PoB connection rules: no links across ascendancies (or between an
+            // ascendancy node and the main tree), and none from class-start hubs.
+            if ((n.a || "") !== (m.a || "")) continue;
+            if (n.cs || m.cs) continue;
             const key = n.id < cid ? n.id + ":" + cid : cid + ":" + n.id;
             if (seen.has(key)) continue;
             seen.add(key);
