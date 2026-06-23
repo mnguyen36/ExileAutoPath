@@ -52,6 +52,10 @@ for id, node in pairs(tree.nodes) do
       if node.isKeystone then parts[#parts + 1] = ',"k":1' end
       if node.isNotable then parts[#parts + 1] = ',"t":1' end
       if node.name and node.name ~= "" then parts[#parts + 1] = ',"n":' .. jstr(node.name) end
+      if type(node.icon) == "string" and node.icon ~= "" then
+        local ic = node.icon:gsub("%.dds$", ".webp"):gsub("^Art/2DArt/SkillIcons/", "")
+        parts[#parts + 1] = ',"i":' .. jstr(ic)
+      end
       if type(node.stats) == "table" then
         local sd = {}
         for _, line in ipairs(node.stats) do

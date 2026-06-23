@@ -54,7 +54,12 @@
       #tree circle.cu { fill: var(--gold); }
       #tree circle.ct { fill: var(--teal); }
       #tree circle.ck { fill: var(--violet); }
-      #tree #hl { fill: none; stroke: #ffffff; stroke-width: 5; opacity: 0.85; pointer-events: none; }
+      #tree #hl { fill: none; stroke: #ffffff; stroke-width: 6; opacity: 0.85; pointer-events: none; }
+      #tree image.nicon { clip-path: circle(46%); cursor: pointer; }
+      #tree circle.frame { fill: none; stroke-width: 11; pointer-events: none; }
+      #tree circle.frame.fu { stroke: #f4cd7e; }
+      #tree circle.frame.ft { stroke: #74e0c0; }
+      #tree circle.frame.fk { stroke: #d4b3ff; stroke-width: 18; }
       #treeSide { width: 332px; flex: none; height: 620px; overflow-y: auto; border: 1px solid #20283a; border-radius: 14px; padding: 14px; font-size: 13px;
         background: linear-gradient(#11141b, #0d1016); }
       #treeSide::-webkit-scrollbar { width: 10px; }
@@ -185,20 +190,23 @@
             else base += seg;
           }
         }
-        // Nodes: faint dots for the unallocated tree; glowing halo + bright core
-        // for allocated/path nodes (gold = yours, teal = adds, violet = keystone).
-        let bg = "", halos = "", cores = "";
+        // Nodes: faint dots for the unallocated tree; glowing halo + the real
+        // game node icon, framed by allocation (gold = yours, teal = adds,
+        // violet = keystone). Icons come from mobalytics' game-asset CDN.
+        const ICON = "https://cdn.mobalytics.gg/cdn-cgi/image/format=auto,width=64/assets/poe-2/images/game/Art/2DArt/SkillIcons/";
+        let bg = "", halos = "", icons = "", frames = "";
         for (const n of t.nodes) {
           const u = userSet.has(n.id), tg = targetSet.has(n.id);
           if (!u && !tg) {
             bg += `<circle class="bgnode" cx="${n.x}" cy="${n.y}" r="9" data-id="${n.id}"/>`;
             continue;
           }
-          let coreCls, grad, cr, hr;
-          if (n.k) { coreCls = "ck"; grad = "gViolet"; cr = 115; hr = 360; }
-          else { coreCls = u ? "cu" : "ct"; grad = u ? "gGold" : "gTeal"; cr = n.t ? 82 : 56; hr = n.t ? 250 : 180; }
-          halos += `<circle class="halo" cx="${n.x}" cy="${n.y}" r="${hr}" fill="url(#${grad})"/>`;
-          cores += `<circle class="core ${coreCls}" cx="${n.x}" cy="${n.y}" r="${cr}" data-id="${n.id}"/>`;
+          const r = n.k ? 150 : n.t ? 108 : 76; // icon radius
+          const grad = n.k ? "gViolet" : u ? "gGold" : "gTeal";
+          const frameCls = n.k ? "fk" : u ? "fu" : "ft";
+          halos += `<circle class="halo" cx="${n.x}" cy="${n.y}" r="${r * 2.3}" fill="url(#${grad})"/>`;
+          if (n.i) icons += `<image class="nicon" href="${ICON}${n.i}" x="${n.x - r}" y="${n.y - r}" width="${2 * r}" height="${2 * r}" data-id="${n.id}"/>`;
+          frames += `<circle class="frame ${frameCls}" cx="${n.x}" cy="${n.y}" r="${r}"/>`;
         }
         const defs =
           "<defs>" +
@@ -211,21 +219,27 @@
           `<path class="edges" d="${base}"/>` +
           `<path class="edgesPath" d="${pathE}"/>` +
           `<path class="edgesGold" d="${gold}"/>` +
-          bg + halos + cores +
+          bg + halos + icons + frames +
           '<circle id="hl" cx="0" cy="0" r="0"/>';
         buildSummary(t, tree.userNodes, tree.targetNodes || []);
 
         const focus = t.nodes.filter((n) => inSet(n.id));
-        let bb;
-        if (focus.length) {
-          const xs = focus.map((n) => n.x), ys = focus.map((n) => n.y);
-          bb = { x: Math.min(...xs), y: Math.min(...ys), X: Math.max(...xs), Y: Math.max(...ys) };
-        } else {
-          bb = { x: t.minX, y: t.minY, X: t.maxX, Y: t.maxY };
-        }
-        const pad = Math.max(bb.X - bb.x, bb.Y - bb.y) * 0.1 + 350;
+        const bb = focus.length
+          ? { x: Math.min(...focus.map((n) => n.x)), y: Math.min(...focus.map((n) => n.y)), X: Math.max(...focus.map((n) => n.x)), Y: Math.max(...focus.map((n) => n.y)) }
+          : { x: t.minX, y: t.minY, X: t.maxX, Y: t.maxY };
+        const pad = Math.max(bb.X - bb.x, bb.Y - bb.y) * 0.08 + 300;
+        // "Fit" shows the whole allocation; the default opens closer so icons read.
         TREE._fit = { x: bb.x - pad, y: bb.y - pad, w: bb.X - bb.x + 2 * pad, h: bb.Y - bb.y + 2 * pad };
-        setViewBox(TREE._fit.x, TREE._fit.y, TREE._fit.w, TREE._fit.h);
+        const rect = svg.getBoundingClientRect();
+        const ratio = rect.height / rect.width || 0.66;
+        if (focus.length) {
+          const cx = focus.reduce((a, n) => a + n.x, 0) / focus.length;
+          const cy = focus.reduce((a, n) => a + n.y, 0) / focus.length;
+          const W = Math.min(TREE._fit.w, 4400);
+          setViewBox(cx - W / 2, cy - (W * ratio) / 2, W, W * ratio);
+        } else {
+          setViewBox(TREE._fit.x, TREE._fit.y, TREE._fit.w, TREE._fit.h);
+        }
         $("treePanel").style.display = "block";
       }
       svg.addEventListener("wheel", (e) => {
@@ -290,7 +304,7 @@
         if (hl) {
           hl.setAttribute("cx", node.x);
           hl.setAttribute("cy", node.y);
-          hl.setAttribute("r", node.k ? 150 : node.t ? 112 : 82);
+          hl.setAttribute("r", node.k ? 178 : node.t ? 132 : 96);
         }
       }
       svg.addEventListener("mouseover", (e) => {
