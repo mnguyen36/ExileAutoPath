@@ -205,13 +205,19 @@
         };
         // Edges in three layers: faint background, lit-gold (within your tree),
         // and the teal path (connecting your tree to the build's additions).
+        // Connections are stored directionally (only one of the two nodes lists
+        // the link), so collect undirected pairs — drawing an edge if EITHER
+        // node references it — to avoid missing connections.
         let base = "", gold = "", pathE = "";
+        const seen = new Set();
         for (const n of t.nodes) {
           if (!n.c) continue;
           for (const cid of n.c) {
-            if (n.id >= cid) continue; // dedupe undirected edges
             const m = t.byId.get(cid);
             if (!m) continue;
+            const key = n.id < cid ? n.id + ":" + cid : cid + ":" + n.id;
+            if (seen.has(key)) continue;
+            seen.add(key);
             const seg = edgeSeg(n, m);
             if (userSet.has(n.id) && userSet.has(cid)) gold += seg;
             else if (inSet(n.id) && inSet(cid)) pathE += seg;
