@@ -129,7 +129,7 @@ export function renderPlanHtml(data: PlanReportData): string {
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
   body { margin:0; font:15px/1.5 system-ui,Segoe UI,Roboto,sans-serif; background:#13151a; color:#e7e3d6; }
-  .wrap { max-width: 860px; margin: 0 auto; padding: 28px 20px 64px; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 20px 56px; }
   header h1 { margin:0 0 2px; font-size:22px; color:#caa85a; }
   header .sub { color:#9a958a; font-size:13px; }
   section { background:#1b1e26; border:1px solid #2a2e39; border-radius:10px; padding:18px 20px; margin-top:18px; }
