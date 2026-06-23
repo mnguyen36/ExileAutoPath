@@ -38,11 +38,15 @@
       .legend .violet { background: var(--violet); box-shadow: 0 0 9px #8b6fd0; }
       .legend #fit { margin-left: auto; }
       .treeWrap { display: flex; gap: 14px; align-items: stretch; }
-      #tree { flex: 1; min-width: 0; height: 620px; border: 1px solid #20283a; border-radius: 14px;
-        background: radial-gradient(ellipse 70% 60% at 50% 45%, #10141d 0%, #070811 78%);
-        box-shadow: inset 0 0 80px rgba(0,0,0,0.65), 0 0 0 1px rgba(202,168,90,0.04);
+      .treeStage { position: relative; flex: 1; min-width: 0; }
+      #tree { width: 100%; height: 640px; border: 1px solid #20283a; border-radius: 14px;
+        background: radial-gradient(ellipse 70% 60% at 50% 45%, #10141d 0%, #060710 80%);
+        box-shadow: inset 0 0 90px rgba(0,0,0,0.7), 0 0 0 1px rgba(202,168,90,0.04);
         touch-action: none; cursor: grab; display: block; }
       #tree:active { cursor: grabbing; }
+      .zoomctl { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; gap: 6px; }
+      .zoomctl button { width: 38px; height: 38px; padding: 0; font-size: 17px; line-height: 1; display: flex; align-items: center; justify-content: center; background: rgba(18,22,32,0.82); border: 1px solid #2a3346; color: #cbb88a; border-radius: 9px; backdrop-filter: blur(4px); cursor: pointer; }
+      .zoomctl button:hover { background: rgba(34,40,56,0.95); border-color: #caa85a; color: #f4cd7e; }
       #tree .edges { stroke: #161d2b; stroke-width: 11; fill: none; }
       #tree .edgesPath { stroke: #38917a; stroke-width: 26; fill: none; stroke-linecap: round; stroke-dasharray: 230 270; animation: flow 3.2s linear infinite; }
       #tree .edgesGold { stroke: #8c6c2b; stroke-width: 22; fill: none; stroke-linecap: round; }
@@ -56,6 +60,7 @@
       #tree circle.ck { fill: var(--violet); }
       #tree #hl { fill: none; stroke: #ffffff; stroke-width: 6; opacity: 0.85; pointer-events: none; }
       #tree image.nicon { clip-path: circle(46%); cursor: pointer; }
+      #tree image.nicon.dim { opacity: 0.5; }
       #tree circle.frame { fill: none; stroke-width: 11; pointer-events: none; }
       #tree circle.frame.fu { stroke: #f4cd7e; }
       #tree circle.frame.ft { stroke: #74e0c0; }
@@ -107,11 +112,18 @@
           <span><i class="gold"></i>your nodes</span>
           <span><i class="teal"></i>path adds</span>
           <span><i class="violet"></i>keystone</span>
-          <span class="hint">scroll to zoom · drag to pan · hover a node for its stats · larger = notable/keystone</span>
-          <button id="fit">Fit</button>
+          <span class="hint">scroll or +/− to zoom · drag to pan · hover a node for its stats</span>
         </div>
         <div class="treeWrap">
-          <svg id="tree" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="treeStage">
+            <svg id="tree" preserveAspectRatio="xMidYMid meet"></svg>
+            <div class="zoomctl">
+              <button id="zin" title="Zoom in">+</button>
+              <button id="zout" title="Zoom out">−</button>
+              <button id="zloc" title="Center on your nodes">⊙</button>
+              <button id="zfit" title="Fit whole tree">⤢</button>
+            </div>
+          </div>
           <aside id="treeSide">
             <div id="nodeDetail" class="card"><span class="hint">Hover or click a node to see its stats.</span></div>
             <div id="nodeSummary"></div>
@@ -190,23 +202,26 @@
             else base += seg;
           }
         }
-        // Nodes: faint dots for the unallocated tree; glowing halo + the real
-        // game node icon, framed by allocation (gold = yours, teal = adds,
-        // violet = keystone). Icons come from mobalytics' game-asset CDN.
-        const ICON = "https://cdn.mobalytics.gg/cdn-cgi/image/format=auto,width=64/assets/poe-2/images/game/Art/2DArt/SkillIcons/";
-        let bg = "", halos = "", icons = "", frames = "";
+        // Whole tree rendered with real game node icons (mobalytics-style):
+        // unallocated nodes are dimmed, your allocation + the build's path are
+        // lit (glow halo + colored frame). Icons from mobalytics' asset CDN;
+        // only ~574 are unique so the browser caches aggressively.
+        const ICON = "https://cdn.mobalytics.gg/cdn-cgi/image/format=auto,width=56/assets/poe-2/images/game/Art/2DArt/SkillIcons/";
+        let dim = "", halos = "", bright = "", frames = "";
         for (const n of t.nodes) {
+          if (!n.i) continue;
           const u = userSet.has(n.id), tg = targetSet.has(n.id);
-          if (!u && !tg) {
-            bg += `<circle class="bgnode" cx="${n.x}" cy="${n.y}" r="9" data-id="${n.id}"/>`;
-            continue;
+          const r = n.k ? 95 : n.t ? 70 : 50;
+          const img = (cls) => `<image class="nicon${cls}" href="${ICON}${n.i}" x="${n.x - r}" y="${n.y - r}" width="${2 * r}" height="${2 * r}" data-id="${n.id}"/>`;
+          if (u || tg) {
+            const grad = n.k ? "gViolet" : u ? "gGold" : "gTeal";
+            const frameCls = n.k ? "fk" : u ? "fu" : "ft";
+            halos += `<circle class="halo" cx="${n.x}" cy="${n.y}" r="${r * 2.5}" fill="url(#${grad})"/>`;
+            bright += img("");
+            frames += `<circle class="frame ${frameCls}" cx="${n.x}" cy="${n.y}" r="${r}"/>`;
+          } else {
+            dim += img(" dim");
           }
-          const r = n.k ? 150 : n.t ? 108 : 76; // icon radius
-          const grad = n.k ? "gViolet" : u ? "gGold" : "gTeal";
-          const frameCls = n.k ? "fk" : u ? "fu" : "ft";
-          halos += `<circle class="halo" cx="${n.x}" cy="${n.y}" r="${r * 2.3}" fill="url(#${grad})"/>`;
-          if (n.i) icons += `<image class="nicon" href="${ICON}${n.i}" x="${n.x - r}" y="${n.y - r}" width="${2 * r}" height="${2 * r}" data-id="${n.id}"/>`;
-          frames += `<circle class="frame ${frameCls}" cx="${n.x}" cy="${n.y}" r="${r}"/>`;
         }
         const defs =
           "<defs>" +
@@ -219,27 +234,28 @@
           `<path class="edges" d="${base}"/>` +
           `<path class="edgesPath" d="${pathE}"/>` +
           `<path class="edgesGold" d="${gold}"/>` +
-          bg + halos + icons + frames +
+          dim + halos + bright + frames +
           '<circle id="hl" cx="0" cy="0" r="0"/>';
         buildSummary(t, tree.userNodes, tree.targetNodes || []);
 
         const focus = t.nodes.filter((n) => inSet(n.id));
-        const bb = focus.length
-          ? { x: Math.min(...focus.map((n) => n.x)), y: Math.min(...focus.map((n) => n.y)), X: Math.max(...focus.map((n) => n.x)), Y: Math.max(...focus.map((n) => n.y)) }
-          : { x: t.minX, y: t.minY, X: t.maxX, Y: t.maxY };
-        const pad = Math.max(bb.X - bb.x, bb.Y - bb.y) * 0.08 + 300;
-        // "Fit" shows the whole allocation; the default opens closer so icons read.
-        TREE._fit = { x: bb.x - pad, y: bb.y - pad, w: bb.X - bb.x + 2 * pad, h: bb.Y - bb.y + 2 * pad };
         const rect = svg.getBoundingClientRect();
         const ratio = rect.height / rect.width || 0.66;
+        // Full-tree overview (the mobalytics-style default view).
+        const fpad = 500;
+        TREE._full = { x: t.minX - fpad, y: t.minY - fpad, w: t.maxX - t.minX + 2 * fpad, h: t.maxY - t.minY + 2 * fpad };
+        // Allocation-centered close view (the ⊙ button).
         if (focus.length) {
           const cx = focus.reduce((a, n) => a + n.x, 0) / focus.length;
           const cy = focus.reduce((a, n) => a + n.y, 0) / focus.length;
-          const W = Math.min(TREE._fit.w, 4400);
-          setViewBox(cx - W / 2, cy - (W * ratio) / 2, W, W * ratio);
+          const xs = focus.map((n) => n.x), ys = focus.map((n) => n.y);
+          const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) * 1.2 + 1200;
+          const W = Math.max(3200, Math.min(span, 9000));
+          TREE._alloc = { x: cx - W / 2, y: cy - (W * ratio) / 2, w: W, h: W * ratio };
         } else {
-          setViewBox(TREE._fit.x, TREE._fit.y, TREE._fit.w, TREE._fit.h);
+          TREE._alloc = TREE._full;
         }
+        setViewBox(TREE._alloc.x, TREE._alloc.y, TREE._alloc.w, TREE._alloc.h);
         $("treePanel").style.display = "block";
       }
       svg.addEventListener("wheel", (e) => {
@@ -260,7 +276,16 @@
         drag = { x: e.clientX, y: e.clientY };
       });
       svg.addEventListener("pointerup", () => (drag = null));
-      $("fit").addEventListener("click", () => { if (TREE && TREE._fit) setViewBox(TREE._fit.x, TREE._fit.y, TREE._fit.w, TREE._fit.h); });
+      function zoomBy(f) {
+        if (!vb) return;
+        const cx = vb.x + vb.w / 2, cy = vb.y + vb.h / 2;
+        setViewBox(cx - (vb.w * f) / 2, cy - (vb.h * f) / 2, vb.w * f, vb.h * f);
+      }
+      const toBox = (o) => { if (o) setViewBox(o.x, o.y, o.w, o.h); };
+      $("zin").addEventListener("click", () => zoomBy(0.7));
+      $("zout").addEventListener("click", () => zoomBy(1.43));
+      $("zloc").addEventListener("click", () => toBox(TREE && TREE._alloc));
+      $("zfit").addEventListener("click", () => toBox(TREE && TREE._full));
 
       function showDetail(node) {
         if (!node) return;
