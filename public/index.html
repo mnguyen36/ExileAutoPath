@@ -187,6 +187,22 @@
         const userSet = new Set(tree.userNodes);
         const targetSet = new Set(tree.targetNodes || []);
         const inSet = (id) => userSet.has(id) || targetSet.has(id);
+        // An edge between two nodes on the SAME orbit ring of the SAME group
+        // follows that ring as an arc (like in-game); everything else is a
+        // straight line. Arc radius = node's distance to its group centre.
+        const edgeSeg = (a, b) => {
+          if (a.g != null && a.g === b.g && a.o === b.o && a.o > 0) {
+            const gc = t.groups[a.g];
+            if (gc) {
+              const r = Math.hypot(a.x - gc[0], a.y - gc[1]);
+              let d = Math.atan2(b.y - gc[1], b.x - gc[0]) - Math.atan2(a.y - gc[1], a.x - gc[0]);
+              while (d > Math.PI) d -= 2 * Math.PI;
+              while (d < -Math.PI) d += 2 * Math.PI;
+              return `M${a.x} ${a.y}A${r.toFixed(1)} ${r.toFixed(1)} 0 0 ${d > 0 ? 1 : 0} ${b.x} ${b.y}`;
+            }
+          }
+          return `M${a.x} ${a.y}L${b.x} ${b.y}`;
+        };
         // Edges in three layers: faint background, lit-gold (within your tree),
         // and the teal path (connecting your tree to the build's additions).
         let base = "", gold = "", pathE = "";
@@ -196,7 +212,7 @@
             if (n.id >= cid) continue; // dedupe undirected edges
             const m = t.byId.get(cid);
             if (!m) continue;
-            const seg = `M${n.x} ${n.y}L${m.x} ${m.y}`;
+            const seg = edgeSeg(n, m);
             if (userSet.has(n.id) && userSet.has(cid)) gold += seg;
             else if (inSet(n.id) && inSet(cid)) pathE += seg;
             else base += seg;

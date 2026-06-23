@@ -38,17 +38,20 @@ local function jnum(n)
 end
 
 local out, n = {}, 0
+local usedGroups = {}
 local minx, miny, maxx, maxy = 1e18, 1e18, -1e18, -1e18
 for id, node in pairs(tree.nodes) do
   local nid = tonumber(node.skill) or tonumber(id)
   if nid and node.group and node.orbit ~= nil and not node.isProxy then
     local x, y = pos(node)
     if x then
+      usedGroups[node.group] = getGroup(node.group)
       if x < minx then minx = x end
       if x > maxx then maxx = x end
       if y < miny then miny = y end
       if y > maxy then maxy = y end
       local parts = { '{"id":' .. jnum(nid) .. ',"x":' .. jnum(x) .. ',"y":' .. jnum(y) }
+      parts[#parts + 1] = ',"g":' .. jnum(node.group) .. ',"o":' .. jnum(node.orbit)
       if node.isKeystone then parts[#parts + 1] = ',"k":1' end
       if node.isNotable then parts[#parts + 1] = ',"t":1' end
       if node.name and node.name ~= "" then parts[#parts + 1] = ',"n":' .. jstr(node.name) end
@@ -78,9 +81,15 @@ for id, node in pairs(tree.nodes) do
   end
 end
 
+-- Group centres (for drawing orbit arcs between same-group/same-orbit nodes).
+local gparts = {}
+for gid, g in pairs(usedGroups) do
+  if g then gparts[#gparts + 1] = '"' .. jnum(gid) .. '":[' .. jnum(g.x) .. "," .. jnum(g.y) .. "]" end
+end
+
 local f = assert(io.open(outPath, "w"))
-f:write('{"minX":' .. jnum(minx) .. ',"minY":' .. jnum(miny) .. ',"maxX":' .. jnum(maxx) .. ',"maxY":' .. jnum(maxy) .. ',"nodes":[')
-f:write(table.concat(out, ","))
-f:write("]}")
+f:write('{"minX":' .. jnum(minx) .. ',"minY":' .. jnum(miny) .. ',"maxX":' .. jnum(maxx) .. ',"maxY":' .. jnum(maxy))
+f:write(',"groups":{' .. table.concat(gparts, ",") .. "}")
+f:write(',"nodes":[' .. table.concat(out, ",") .. "]}")
 f:close()
 io.stderr:write(string.format("nodes=%d bounds=(%d,%d)..(%d,%d)\n", n, minx, miny, maxx, maxy))
