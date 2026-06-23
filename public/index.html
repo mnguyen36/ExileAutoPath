@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ExileAutoPath — PoE2 build path</title>
     <style>
-      :root { color-scheme: dark; }
+      @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&display=swap');
+      :root { color-scheme: dark; --gold:#f4cd7e; --teal:#74e0c0; --violet:#c9a4f5; }
       * { box-sizing: border-box; }
-      body { margin: 0; font: 15px/1.5 system-ui, Segoe UI, Roboto, sans-serif; background: #13151a; color: #e7e3d6; }
-      header { padding: 20px; border-bottom: 1px solid #2a2e39; }
-      header h1 { margin: 0; font-size: 20px; color: #caa85a; }
+      body { margin: 0; font: 15px/1.5 system-ui, Segoe UI, Roboto, sans-serif; background: #0c0e13; color: #e7e3d6; }
+      header { padding: 22px 20px; border-bottom: 1px solid #20283a; background: linear-gradient(#11141b, #0c0e13); }
+      header h1 { margin: 0; font-family: 'Cinzel', Georgia, serif; font-weight: 700; letter-spacing: 0.14em; font-size: 21px; color: #e3c178; text-transform: uppercase; }
       header p { margin: 2px 0 0; color: #9a958a; font-size: 13px; }
       .wrap { max-width: 920px; margin: 0 auto; padding: 20px; }
       .panel { background: #1b1e26; border: 1px solid #2a2e39; border-radius: 10px; padding: 16px; }
@@ -25,33 +26,53 @@
       .status.warn { color: #e6cf94; }
       iframe { width: 100%; min-height: 720px; border: 1px solid #2a2e39; border-radius: 10px; margin-top: 16px; background: #13151a; }
       a { color: #6fa8d6; }
-      #treePanel { margin-top: 16px; display: none; }
-      #treePanel h2 { font-size: 16px; color: #caa85a; margin: 0 0 8px; }
-      .legend { font-size: 12px; color: #9a958a; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
-      .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
-      .treeWrap { display: flex; gap: 12px; align-items: stretch; }
-      #tree { flex: 1; min-width: 0; height: 600px; background: #0f1115; border: 1px solid #2a2e39; border-radius: 10px; touch-action: none; cursor: grab; display: block; }
+      /* ---------- passive tree: arcane star-map ---------- */
+      #treePanel { margin-top: 24px; display: none; }
+      .treeHead { display: flex; align-items: baseline; gap: 12px; margin: 0 0 10px; }
+      .treeHead h2 { font-family: 'Cinzel', Georgia, serif; font-weight: 600; font-size: 17px; letter-spacing: 0.1em; color: #e3c178; margin: 0; text-transform: uppercase; }
+      .treeHead .sub { color: #6f7689; font-size: 12px; }
+      .legend { font-size: 11.5px; color: #8893a6; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; letter-spacing: 0.02em; }
+      .legend i { width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; display: inline-block; vertical-align: middle; }
+      .legend .gold { background: var(--gold); box-shadow: 0 0 9px #caa85a; }
+      .legend .teal { background: var(--teal); box-shadow: 0 0 9px #3aa288; }
+      .legend .violet { background: var(--violet); box-shadow: 0 0 9px #8b6fd0; }
+      .legend #fit { margin-left: auto; }
+      .treeWrap { display: flex; gap: 14px; align-items: stretch; }
+      #tree { flex: 1; min-width: 0; height: 620px; border: 1px solid #20283a; border-radius: 14px;
+        background: radial-gradient(ellipse 70% 60% at 50% 45%, #10141d 0%, #070811 78%);
+        box-shadow: inset 0 0 80px rgba(0,0,0,0.65), 0 0 0 1px rgba(202,168,90,0.04);
+        touch-action: none; cursor: grab; display: block; }
       #tree:active { cursor: grabbing; }
-      #treeSide { width: 320px; flex: none; height: 600px; overflow-y: auto; background: #1b1e26; border: 1px solid #2a2e39; border-radius: 10px; padding: 12px; font-size: 13px; }
-      #treeSide .card { background: #23262f; border: 1px solid #30343f; border-radius: 8px; padding: 10px; margin-bottom: 12px; min-height: 56px; }
-      #treeSide h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #8a857a; margin: 14px 0 6px; }
-      #treeSide .grp { font-size: 11px; color: #8a857a; margin: 8px 0 4px; }
-      .nodeName { color: #caa85a; font-weight: 600; margin-bottom: 4px; }
-      .ni { padding: 6px 8px; border-radius: 6px; margin: 4px 0; background: #23262f; cursor: pointer; border-left: 3px solid #3a3f4d; }
-      .ni:hover { background: #2a2e39; }
-      .ni.k { border-left-color: #9a7fc0; }
-      .ni.t { border-left-color: #59617a; }
-      .ni.add { border-left-color: #5fae7a; }
-      .ni b { color: #e7e3d6; }
-      .ni small { color: #9a958a; display: block; }
-      @media (max-width: 720px) { .treeWrap { flex-direction: column; } #treeSide { width: auto; height: 260px; } }
-      #tree .edges { stroke: #262b37; stroke-width: 8; fill: none; }
-      #tree .edgesAdd { stroke: #3f6b50; stroke-width: 14; fill: none; }
-      #tree circle.n { fill: #353b49; }
-      #tree circle.nn { fill: #59617a; }
-      #tree circle.nk { fill: #9a7fc0; }
-      #tree circle.nt { fill: #5fae7a; }
-      #tree circle.nu { fill: #caa85a; }
+      #tree .edges { stroke: #161d2b; stroke-width: 11; fill: none; }
+      #tree .edgesPath { stroke: #38917a; stroke-width: 26; fill: none; stroke-linecap: round; stroke-dasharray: 230 270; animation: flow 3.2s linear infinite; }
+      #tree .edgesGold { stroke: #8c6c2b; stroke-width: 22; fill: none; stroke-linecap: round; }
+      @keyframes flow { to { stroke-dashoffset: -500; } }
+      @media (prefers-reduced-motion: reduce) { #tree .edgesPath { animation: none; stroke-dasharray: none; } }
+      #tree circle.bgnode { fill: #232b3d; }
+      #tree circle.halo { pointer-events: none; }
+      #tree circle.core { cursor: pointer; }
+      #tree circle.cu { fill: var(--gold); }
+      #tree circle.ct { fill: var(--teal); }
+      #tree circle.ck { fill: var(--violet); }
+      #tree #hl { fill: none; stroke: #ffffff; stroke-width: 5; opacity: 0.85; pointer-events: none; }
+      #treeSide { width: 332px; flex: none; height: 620px; overflow-y: auto; border: 1px solid #20283a; border-radius: 14px; padding: 14px; font-size: 13px;
+        background: linear-gradient(#11141b, #0d1016); }
+      #treeSide::-webkit-scrollbar { width: 10px; }
+      #treeSide::-webkit-scrollbar-thumb { background: #283346; border-radius: 6px; border: 2px solid #0d1016; }
+      #nodeDetail { background: #141822; border: 1px solid #232c40; border-top: 2px solid #caa85a; border-radius: 9px; padding: 12px; margin-bottom: 14px; min-height: 62px; }
+      .nodeName { font-family: 'Cinzel', Georgia, serif; font-size: 14px; letter-spacing: 0.04em; color: var(--gold); margin-bottom: 6px; }
+      #nodeDetail div:not(.nodeName) { color: #c4ccdb; font-size: 12.5px; margin: 2px 0; }
+      #treeSide h3 { font-family: 'Cinzel', Georgia, serif; font-weight: 600; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #caa85a; margin: 16px 0 8px; padding-bottom: 5px; border-bottom: 1px solid #1d2435; }
+      #treeSide .grp { font-size: 11px; color: #6f7689; margin: 10px 0 5px; letter-spacing: 0.03em; }
+      .ni { display: flex; gap: 9px; padding: 7px 9px; border-radius: 7px; margin: 5px 0; background: #141822; cursor: pointer; transition: background 0.12s ease, transform 0.12s ease; }
+      .ni:hover { background: #1b2130; transform: translateX(2px); }
+      .ni .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex: none; background: #5b647a; }
+      .ni.k .dot { background: var(--violet); box-shadow: 0 0 7px #8b6fd0; }
+      .ni.t .dot { background: #cfd6e6; }
+      .ni.add .dot { background: var(--teal); box-shadow: 0 0 7px #3aa288; }
+      .ni b { color: #e7e3d6; font-weight: 600; }
+      .ni small { color: #8893a6; display: block; line-height: 1.35; }
+      @media (max-width: 760px) { .treeWrap { flex-direction: column; } #treeSide { width: auto; height: 300px; } #tree { height: 440px; } }
     </style>
   </head>
   <body>
@@ -73,14 +94,16 @@
       <iframe id="report" title="report" sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe>
 
       <div id="treePanel">
-        <h2>Passive tree</h2>
+        <div class="treeHead">
+          <h2>Passive Tree</h2>
+          <span class="sub">your allocation, lit · the path to the closest build, in teal</span>
+        </div>
         <div class="legend">
-          <span><i style="background:#caa85a"></i>your allocation</span>
-          <span><i style="background:#5fae7a"></i>nodes the #1 build adds</span>
-          <span><i style="background:#9a7fc0"></i>keystone</span>
-          <span><i style="background:#59617a"></i>notable</span>
+          <span><i class="gold"></i>your nodes</span>
+          <span><i class="teal"></i>path adds</span>
+          <span><i class="violet"></i>keystone</span>
+          <span class="hint">scroll to zoom · drag to pan · hover a node for its stats · larger = notable/keystone</span>
           <button id="fit">Fit</button>
-          <span class="hint">scroll to zoom · drag to pan · hover/click a node</span>
         </div>
         <div class="treeWrap">
           <svg id="tree" preserveAspectRatio="xMidYMid meet"></svg>
@@ -147,7 +170,9 @@
         const userSet = new Set(tree.userNodes);
         const targetSet = new Set(tree.targetNodes || []);
         const inSet = (id) => userSet.has(id) || targetSet.has(id);
-        let base = "", add = "";
+        // Edges in three layers: faint background, lit-gold (within your tree),
+        // and the teal path (connecting your tree to the build's additions).
+        let base = "", gold = "", pathE = "";
         for (const n of t.nodes) {
           if (!n.c) continue;
           for (const cid of n.c) {
@@ -155,21 +180,39 @@
             const m = t.byId.get(cid);
             if (!m) continue;
             const seg = `M${n.x} ${n.y}L${m.x} ${m.y}`;
-            if (inSet(n.id) && inSet(m.id)) add += seg;
+            if (userSet.has(n.id) && userSet.has(cid)) gold += seg;
+            else if (inSet(n.id) && inSet(cid)) pathE += seg;
             else base += seg;
           }
         }
-        let circles = "";
+        // Nodes: faint dots for the unallocated tree; glowing halo + bright core
+        // for allocated/path nodes (gold = yours, teal = adds, violet = keystone).
+        let bg = "", halos = "", cores = "";
         for (const n of t.nodes) {
-          let cls = "n", r = 16;
-          if (userSet.has(n.id)) { cls = "nu"; r = 62; }
-          else if (targetSet.has(n.id)) { cls = "nt"; r = 54; }
-          else if (n.k) { cls = "nk"; r = 42; }
-          else if (n.t) { cls = "nn"; r = 26; }
-          const title = (n.n || "").replace(/[<&>]/g, "");
-          circles += `<circle class="${cls}" cx="${n.x}" cy="${n.y}" r="${r}" data-id="${n.id}">${title ? `<title>${title}</title>` : ""}</circle>`;
+          const u = userSet.has(n.id), tg = targetSet.has(n.id);
+          if (!u && !tg) {
+            bg += `<circle class="bgnode" cx="${n.x}" cy="${n.y}" r="9" data-id="${n.id}"/>`;
+            continue;
+          }
+          let coreCls, grad, cr, hr;
+          if (n.k) { coreCls = "ck"; grad = "gViolet"; cr = 115; hr = 360; }
+          else { coreCls = u ? "cu" : "ct"; grad = u ? "gGold" : "gTeal"; cr = n.t ? 82 : 56; hr = n.t ? 250 : 180; }
+          halos += `<circle class="halo" cx="${n.x}" cy="${n.y}" r="${hr}" fill="url(#${grad})"/>`;
+          cores += `<circle class="core ${coreCls}" cx="${n.x}" cy="${n.y}" r="${cr}" data-id="${n.id}"/>`;
         }
-        svg.innerHTML = `<path class="edges" d="${base}"/><path class="edgesAdd" d="${add}"/>${circles}`;
+        const defs =
+          "<defs>" +
+          '<radialGradient id="gGold"><stop offset="0" stop-color="#f4cd7e" stop-opacity=".5"/><stop offset="1" stop-color="#f4cd7e" stop-opacity="0"/></radialGradient>' +
+          '<radialGradient id="gTeal"><stop offset="0" stop-color="#74e0c0" stop-opacity=".5"/><stop offset="1" stop-color="#74e0c0" stop-opacity="0"/></radialGradient>' +
+          '<radialGradient id="gViolet"><stop offset="0" stop-color="#c9a4f5" stop-opacity=".55"/><stop offset="1" stop-color="#c9a4f5" stop-opacity="0"/></radialGradient>' +
+          "</defs>";
+        svg.innerHTML =
+          defs +
+          `<path class="edges" d="${base}"/>` +
+          `<path class="edgesPath" d="${pathE}"/>` +
+          `<path class="edgesGold" d="${gold}"/>` +
+          bg + halos + cores +
+          '<circle id="hl" cx="0" cy="0" r="0"/>';
         buildSummary(t, tree.userNodes, tree.targetNodes || []);
 
         const focus = t.nodes.filter((n) => inSet(n.id));
@@ -180,7 +223,7 @@
         } else {
           bb = { x: t.minX, y: t.minY, X: t.maxX, Y: t.maxY };
         }
-        const pad = Math.max(bb.X - bb.x, bb.Y - bb.y) * 0.2 + 600;
+        const pad = Math.max(bb.X - bb.x, bb.Y - bb.y) * 0.1 + 350;
         TREE._fit = { x: bb.x - pad, y: bb.y - pad, w: bb.X - bb.x + 2 * pad, h: bb.Y - bb.y + 2 * pad };
         setViewBox(TREE._fit.x, TREE._fit.y, TREE._fit.w, TREE._fit.h);
         $("treePanel").style.display = "block";
@@ -221,7 +264,7 @@
       function nodeLine(node, extraCls) {
         const stats = (node.d || []).map((s) => `<small>${esc(s)}</small>`).join("");
         const cls = node.k ? "k" : node.t ? "t" : "";
-        return `<div class="ni ${cls} ${extraCls || ""}" data-id="${node.id}"><b>${esc(node.n || "Node " + node.id)}</b>${stats}</div>`;
+        return `<div class="ni ${cls} ${extraCls || ""}" data-id="${node.id}"><span class="dot"></span><div><b>${esc(node.n || "Node " + node.id)}</b>${stats}</div></div>`;
       }
       function buildSummary(t, userNodes, targetNodes) {
         const uSet = new Set(userNodes);
@@ -240,19 +283,33 @@
         }
         $("nodeSummary").innerHTML = h;
       }
+      function highlight(node) {
+        if (!node) return;
+        showDetail(node);
+        const hl = document.getElementById("hl");
+        if (hl) {
+          hl.setAttribute("cx", node.x);
+          hl.setAttribute("cy", node.y);
+          hl.setAttribute("r", node.k ? 150 : node.t ? 112 : 82);
+        }
+      }
       svg.addEventListener("mouseover", (e) => {
         const id = e.target && e.target.getAttribute && e.target.getAttribute("data-id");
-        if (id && TREE) showDetail(TREE.byId.get(+id));
+        if (id && TREE) highlight(TREE.byId.get(+id));
+      });
+      svg.addEventListener("mouseout", (e) => {
+        const id = e.target && e.target.getAttribute && e.target.getAttribute("data-id");
+        if (id) { const hl = document.getElementById("hl"); if (hl) hl.setAttribute("r", "0"); }
       });
       svg.addEventListener("click", (e) => {
         const id = e.target && e.target.getAttribute && e.target.getAttribute("data-id");
-        if (id && TREE) showDetail(TREE.byId.get(+id));
+        if (id && TREE) highlight(TREE.byId.get(+id));
       });
       $("nodeSummary").addEventListener("click", (e) => {
         const el = e.target.closest(".ni");
         if (!el || !TREE) return;
         const node = TREE.byId.get(+el.getAttribute("data-id"));
-        showDetail(node);
+        highlight(node);
         panTo(node);
       });
 
