@@ -14,15 +14,17 @@ local function getGroup(gid)
   return groups[gid] or groups[tostring(gid)] or groups[tonumber(gid)]
 end
 
+-- Matches PoB exactly (PassiveTree.lua): angle = orbitAnglesByOrbit[o+1][oidx+1],
+-- radius = orbitRadii[o+1]; x = group.x + sin(angle)*r, y = group.y - cos(angle)*r.
 local function pos(node)
   local g = getGroup(node.group)
   if not g then return nil end
   local orbit = node.orbit or 0
   if orbit == 0 then return g.x, g.y end
-  local r = radii[orbit] or radii[orbit + 1]
-  local angles = angById[orbit] or angById[orbit + 1]
+  local r = radii[orbit + 1]
+  local angles = angById[orbit + 1]
   if not r or not angles then return g.x, g.y end
-  local a = angles[(node.orbitIndex or 0) + 1] or angles[node.orbitIndex or 0] or 0
+  local a = angles[(node.orbitIndex or 0) + 1] or 0
   return g.x + r * math.sin(a), g.y - r * math.cos(a)
 end
 
