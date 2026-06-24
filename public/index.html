@@ -174,6 +174,33 @@
       let vb = null;
       const svg = $("tree");
 
+      // Ascendancy + class portrait positions in tree coordinates (from tree.json).
+      // file = public/portraits/<file>.png (spaces replaced with _).
+      const ASC_PORTRAITS = [
+        {name:'Deadeye',       file:'Deadeye',            x:15451.7, y:1623.2},
+        {name:'Pathfinder',    file:'Pathfinder',         x:14776.6, y:4800.4},
+        {name:'Amazon',        file:'Amazon',             x:13455.6, y:7767.7},
+        {name:'Spirit Walker', file:'Spirit_Walker',      x:11546.6, y:10395.5},
+        {name:'Ritualist',     file:'Ritualist',          x:9132.9,  y:12569.0},
+        {name:'Titan',         file:'Titan',              x:-11551.1,y:10390.5},
+        {name:'Warbringer',    file:'Warbringer',         x:-13459.0,y:7761.9},
+        {name:'Smith of Kitava',file:'Smith_of_Kitava',  x:-14778.7,y:4794.0},
+        {name:'Tactician',     file:'Tactician',          x:3250.4,  y:15193.0},
+        {name:'Witchhunter',   file:'Witchhunter',        x:20.6,    y:15536.8},
+        {name:'Gemling Legionnaire',file:'Gemling_Legionnaire',x:-3210.1,y:15201.5},
+        {name:'Oracle',        file:'Oracle',             x:-14155.4,y:-6404.4},
+        {name:'Shaman',        file:'Shaman',             x:-12514.5,y:-9207.5},
+        {name:'Infernalist',   file:'Infernalist',        x:-9132.3, y:-12569.5},
+        {name:'Blood Mage',    file:'Blood_Mage',         x:-6319.4, y:-14193.5},
+        {name:'Lich',          file:'Lich',               x:-3230.3, y:-15197.2},
+        {name:'Stormweaver',   file:'Stormweaver',        x:0.0,     y:-15536.8},
+        {name:'Chronomancer',  file:'Chronomancer',       x:3230.3,  y:-15197.2},
+        {name:'Disciple of Varashta',file:'Disciple_of_Varashta',x:6319.4,y:-14193.5},
+        {name:'Martial Artist',file:'Martial_Artist',     x:11574.6, y:-10364.4},
+        {name:'Invoker',       file:'Invoker',            x:13476.5, y:-7731.4},
+        {name:'Acolyte of Chayula',file:'Acolyte_of_Chayula',x:14789.5,y:-4760.5},
+      ];
+
       async function loadTree() {
         if (TREE) return TREE;
         const t = await fetch("/tree-0_5.json").then((r) => r.json());
@@ -185,7 +212,7 @@
         vb = { x, y, w, h };
         svg.setAttribute("viewBox", `${x} ${y} ${w} ${h}`);
       }
-      async function showTree(tree) {
+      async function showTree(tree, user) {
         if (!tree || !tree.userNodes) return;
         const t = await loadTree().catch(() => null);
         if (!t) return;
@@ -254,14 +281,48 @@
             dim += img(" dim");
           }
         }
+        // Build portrait layer: class portrait at center + all ascendancy portraits.
+        // Each image is 1500×1500 tree units, softly clipped to a circle with a
+        // radial-gradient mask so edges fade out instead of hard-clip.
+        const P = 750; // half-size (portrait radius) in tree units
+        const VIGN =
+          '<radialGradient id="portVign" cx="50%" cy="50%" r="50%">' +
+          '<stop offset="55%" stop-color="white" stop-opacity="1"/>' +
+          '<stop offset="100%" stop-color="white" stop-opacity="0"/>' +
+          '</radialGradient>' +
+          '<mask id="portMask" maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">' +
+          '<rect width="1" height="1" fill="url(#portVign)"/>' +
+          '</mask>';
+
+        let portraits = "";
+        // Class portrait — centered at tree origin (0,0), slightly larger
+        if (user && user.className) {
+          const cf = user.className.replace(/ /g, "_");
+          portraits +=
+            `<image href="/portraits/${cf}.png" x="${-P*1.33}" y="${-P*1.33}" width="${P*2.67}" height="${P*2.67}" mask="url(#portMask)" opacity="0.82" style="pointer-events:none"/>` +
+            `<circle cx="0" cy="0" r="${P*1.26}" fill="none" stroke="#caa85a" stroke-width="22" opacity="0.28" style="pointer-events:none"/>`;
+        }
+        // Ascendancy portraits
+        for (const asc of ASC_PORTRAITS) {
+          const active = user && (user.ascendancy === asc.name);
+          const op = active ? 0.92 : 0.72;
+          const strokeCol = active ? "#e6cf94" : "#3a3f52";
+          const strokeOp = active ? 0.85 : 0.25;
+          portraits +=
+            `<image href="/portraits/${asc.file}.png" x="${asc.x - P}" y="${asc.y - P}" width="${P*2}" height="${P*2}" mask="url(#portMask)" opacity="${op}" style="pointer-events:none"/>` +
+            `<circle cx="${asc.x}" cy="${asc.y}" r="${P * 0.94}" fill="none" stroke="${strokeCol}" stroke-width="${active ? 28 : 20}" opacity="${strokeOp}" style="pointer-events:none"/>`;
+        }
+
         const defs =
           "<defs>" +
+          VIGN +
           '<radialGradient id="gGold"><stop offset="0" stop-color="#f4cd7e" stop-opacity=".5"/><stop offset="1" stop-color="#f4cd7e" stop-opacity="0"/></radialGradient>' +
           '<radialGradient id="gTeal"><stop offset="0" stop-color="#74e0c0" stop-opacity=".5"/><stop offset="1" stop-color="#74e0c0" stop-opacity="0"/></radialGradient>' +
           '<radialGradient id="gViolet"><stop offset="0" stop-color="#c9a4f5" stop-opacity=".55"/><stop offset="1" stop-color="#c9a4f5" stop-opacity="0"/></radialGradient>' +
           "</defs>";
         svg.innerHTML =
           defs +
+          portraits +
           `<path class="edges" d="${base}"/>` +
           `<path class="edgesPath" d="${pathE}"/>` +
           `<path class="edgesGold" d="${gold}"/>` +
@@ -402,7 +463,7 @@
           const data = await res.json();
           if (!data.ok) { status(data.error || "Analyze failed.", "err"); return; }
           $("report").srcdoc = data.html;
-          showTree(data.tree).catch((e) => console.error("tree render failed", e));
+          showTree(data.tree, data.user).catch((e) => console.error("tree render failed", e));
           const who = `${data.user.ascendancy || data.user.className} / ${data.user.mainSkill || "?"} (L${data.user.level})`;
           const note = data.customTarget ? " · path toward your chosen build" : ` — matched against ${data.corpusSize} builds`;
           status(`${who}${note}${data.engineError ? " · stats unavailable: " + data.engineError : ""}.`, data.engineError ? "warn" : "");
